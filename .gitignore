@@ -1,0 +1,25 @@
+# macOS junk
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# editor config
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# env / secrets (never commit these)
+.env
+.env.*
+*.pem
+*.key
+
+# logs
+*.log
+npm-debug.log*
+
+# dependency caches (if you ever add node tooling)
+node_modules/
+.cache/
