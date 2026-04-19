@@ -541,11 +541,22 @@ if (canvas) {
     animTargets.pupilL.scale.setScalar(pulse);
     animTargets.pupilR.scale.setScalar(pulse);
 
+    // ---- audio reactivity — pulse with the vibe loop's bass ----
+    const vibe = (window.__getVibeLevel ? window.__getVibeLevel() : 0);
+    // smooth the value (avoid jittery snaps)
+    if (typeof animTargets._vibeSmooth !== 'number') animTargets._vibeSmooth = 0;
+    animTargets._vibeSmooth += (vibe - animTargets._vibeSmooth) * 0.18;
+    const vibeS = animTargets._vibeSmooth;
+
     // ---- orbital rings — slow contemplative drift on their tilt axes ----
     // additive deltas so the initial tilts we set above are preserved
-    ring1.rotation.z += 0.0015;
-    ring2.rotation.z -= 0.0011;
-    ring3.rotation.y += 0.0008;
+    ring1.rotation.z += 0.0015 + vibeS * 0.012;
+    ring2.rotation.z -= 0.0011 + vibeS * 0.009;
+    ring3.rotation.y += 0.0008 + vibeS * 0.007;
+    // rings glow brighter on the beat
+    ring1.material.opacity = 0.55 + vibeS * 0.4;
+    ring2.material.opacity = 0.38 + vibeS * 0.32;
+    ring3.material.opacity = 0.28 + vibeS * 0.26;
 
     // ---- orbiting crystals — circle the skull, each spinning ----
     for (const o of animTargets.orbiters) {
@@ -564,8 +575,8 @@ if (canvas) {
     animTargets.halo.rotation.y = -t * 0.15;
     animTargets.halo.rotation.x =  t * 0.1;
 
-    // breathing scale
-    const breath = 1 + Math.sin(t * 1.2) * 0.025;
+    // breathing scale — gets pumped by the music when vibe is on
+    const breath = 1 + Math.sin(t * 1.2) * 0.025 + vibeS * 0.18;
     group.scale.setScalar(breath);
 
     renderer.render(scene, camera);
@@ -872,6 +883,37 @@ if (canvas) {
   audio.volume = 0;
 
   let fadeRAF = null;
+  let audioCtx = null;
+  let analyser = null;
+  let freqData = null;
+
+  /* lazy-init audio analyser (only after first user gesture, browser policy) */
+  function initAnalyser() {
+    if (audioCtx) return;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      audioCtx = new Ctx();
+      const source = audioCtx.createMediaElementSource(audio);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.78;
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      freqData = new Uint8Array(analyser.frequencyBinCount);
+      // expose normalized 0..1 level so the 3D skull can react
+      window.__getVibeLevel = function () {
+        if (!analyser || audio.paused) return 0;
+        analyser.getByteFrequencyData(freqData);
+        // bass band ~ first 8 bins
+        let sum = 0;
+        for (let i = 0; i < 8; i++) sum += freqData[i];
+        return Math.min(1, (sum / 8) / 200);
+      };
+    } catch (err) {
+      console.warn('audio analyser init failed:', err);
+    }
+  }
 
   function fadeTo(target, onDone) {
     if (fadeRAF) cancelAnimationFrame(fadeRAF);
@@ -893,6 +935,10 @@ if (canvas) {
 
   async function play() {
     try {
+      initAnalyser(); // first-click gesture unlocks AudioContext
+      if (audioCtx && audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
       await audio.play();
       btn.classList.add('is-playing');
       btn.classList.remove('vibe-toggle--pulse');
@@ -930,4 +976,105 @@ if (canvas) {
       btn.click();
     }
   });
+})();
+
+/* ============================================
+   CUSTOM LIME CURSOR (desktop only)
+   - dot snaps to mouse, ring lags with easing
+   - grows on interactive elements (a, button, input)
+   ============================================ */
+(function initCursor() {
+  // skip on touch devices
+  if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+
+  const cursor = document.querySelector('.cursor');
+  if (!cursor) return;
+  const dot = cursor.querySelector('.cursor__dot');
+  const ring = cursor.querySelector('.cursor__ring');
+
+  let mx = window.innerWidth / 2;
+  let my = window.innerHeight / 2;
+  let rx = mx, ry = my;     // ring (lagged)
+  let dx = mx, dy = my;     // dot (instant)
+
+  document.addEventListener('mousemove', (e) => {
+    mx = e.clientX;
+    my = e.clientY;
+  });
+
+  // detect hover over interactive elements
+  const interactiveSelector = 'a, button, input, textarea, [role="button"], .letter, .ig-link, .vibe-toggle';
+  document.addEventListener('mouseover', (e) => {
+    if (e.target.closest(interactiveSelector)) cursor.classList.add('is-hover');
+  });
+  document.addEventListener('mouseout', (e) => {
+    if (e.target.closest(interactiveSelector)) cursor.classList.remove('is-hover');
+  });
+
+  document.addEventListener('mousedown', () => cursor.classList.add('is-down'));
+  document.addEventListener('mouseup',   () => cursor.classList.remove('is-down'));
+  document.addEventListener('mouseleave', () => { cursor.style.opacity = '0'; });
+  document.addEventListener('mouseenter', () => { cursor.style.opacity = '1'; });
+
+  function tick() {
+    // dot: snap
+    dx = mx; dy = my;
+    // ring: ease toward mouse (lag)
+    rx += (mx - rx) * 0.18;
+    ry += (my - ry) * 0.18;
+
+    dot.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+    ring.style.transform = `translate3d(${rx}px, ${ry}px, 0)`;
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+
+/* ============================================
+   TITLE GLITCH BURSTS
+   - random ~every 6-12 sec, the title shudders briefly
+   - also triggers on any hover
+   ============================================ */
+(function initGlitch() {
+  const title = document.querySelector('.hero__title');
+  if (!title) return;
+
+  function burst() {
+    title.classList.add('is-glitching');
+    setTimeout(() => title.classList.remove('is-glitching'), 240);
+    // schedule next burst at a random interval
+    const next = 6000 + Math.random() * 6000;
+    setTimeout(burst, next);
+  }
+  // first burst after 4-7 sec (lets user notice the title first)
+  setTimeout(burst, 4000 + Math.random() * 3000);
+})();
+
+/* ============================================
+   STATUS TEXT ROTATION
+   - cycles between vibey "current state" messages
+   - changes every ~7 seconds with a fade
+   ============================================ */
+(function initStatus() {
+  const el = document.getElementById('statusText');
+  if (!el) return;
+
+  const messages = [
+    'in the studio',
+    'mixing the next one',
+    'vibing in sydney',
+    'something is cooking',
+    'on the verge of a drop',
+    'no thoughts just sound',
+    'turning feelings into noise',
+  ];
+  let i = 0;
+  setInterval(() => {
+    el.style.opacity = '0';
+    setTimeout(() => {
+      i = (i + 1) % messages.length;
+      el.textContent = messages[i];
+      el.style.opacity = '1';
+    }, 400);
+  }, 7000);
 })();

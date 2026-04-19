@@ -1229,6 +1229,159 @@ body {
 }
 
 /* ============================================
+   CUSTOM LIME CURSOR (desktop only)
+   - hides default cursor
+   - small lime dot follows mouse instantly
+   - soft lime ring lags behind for that "tech" feel
+   - grows when hovering interactive elements
+   ============================================ */
+@media (hover: hover) and (pointer: fine) {
+  body, body * {
+    cursor: none !important;
+  }
+  .cursor {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    z-index: 9999;
+    mix-blend-mode: screen;
+  }
+  .cursor__dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    background: var(--lime);
+    border-radius: 50%;
+    box-shadow: 0 0 12px rgba(212, 255, 58, 0.85), 0 0 24px rgba(212, 255, 58, 0.4);
+    transition: transform 0.12s ease, opacity 0.2s ease;
+  }
+  .cursor__ring {
+    position: absolute;
+    width: 38px;
+    height: 38px;
+    margin: -19px 0 0 -19px;
+    border: 1.5px solid rgba(212, 255, 58, 0.55);
+    border-radius: 50%;
+    box-shadow: 0 0 16px rgba(212, 255, 58, 0.25);
+    transition: transform 0.18s ease, width 0.2s ease, height 0.2s ease, margin 0.2s ease, border-color 0.2s ease;
+  }
+  /* expanded state on interactive elements */
+  .cursor.is-hover .cursor__dot {
+    transform: scale(0);
+  }
+  .cursor.is-hover .cursor__ring {
+    width: 56px;
+    height: 56px;
+    margin: -28px 0 0 -28px;
+    border-color: var(--lime);
+    background: rgba(212, 255, 58, 0.08);
+  }
+  /* clicked state */
+  .cursor.is-down .cursor__ring {
+    transform: scale(0.85);
+    border-color: var(--pink);
+  }
+}
+/* hide on touch devices entirely */
+.cursor { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .cursor { display: block; }
+}
+
+/* ============================================
+   LIVE STATUS INDICATOR ("in the studio")
+   - top-left fixed pill
+   - tiny pulsing dot
+   - text rotates between vibes
+   ============================================ */
+.status {
+  position: fixed;
+  top: clamp(0.9rem, 2.5vw, 1.4rem);
+  left: clamp(0.9rem, 2.5vw, 1.4rem);
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.85rem 0.45rem 0.7rem;
+  background: rgba(10, 10, 10, 0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(212, 255, 58, 0.28);
+  border-radius: 999px;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(244, 244, 240, 0.85);
+  pointer-events: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+.status__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff3b3b;
+  box-shadow: 0 0 8px rgba(255, 59, 59, 0.8);
+  animation: status-pulse 1.6s ease-in-out infinite;
+}
+.status__text {
+  white-space: nowrap;
+  transition: opacity 0.4s ease;
+}
+@keyframes status-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(255, 59, 59, 0.8), 0 0 0 0 rgba(255, 59, 59, 0.6);
+  }
+  50% {
+    transform: scale(1.15);
+    box-shadow: 0 0 14px rgba(255, 59, 59, 1), 0 0 0 6px rgba(255, 59, 59, 0);
+  }
+}
+@media (max-width: 520px) {
+  .status {
+    font-size: 0.56rem;
+    padding: 0.38rem 0.7rem 0.38rem 0.6rem;
+  }
+}
+
+/* ============================================
+   INTENSIFIED TITLE GLITCH (hover + .is-glitching)
+   ============================================ */
+.hero__title:hover span::after,
+.hero__title.is-glitching span::after {
+  animation-duration: 0.3s !important;
+  opacity: 1 !important;
+  color: rgba(255, 60, 180, 0.85);
+  -webkit-text-fill-color: rgba(255, 60, 180, 0.85);
+}
+.hero__title.is-glitching {
+  animation: title-shake 0.22s steps(4) 1;
+}
+.hero__title.is-glitching span {
+  animation: title-clip 0.22s steps(3) 1;
+}
+@keyframes title-shake {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(3px, -2px) skewX(-2deg); }
+  50%  { transform: translate(-4px, 1px) skewX(1deg); }
+  75%  { transform: translate(2px, 2px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes title-clip {
+  0%   { clip-path: inset(0 0 0 0); }
+  20%  { clip-path: inset(45% 0 30% 0); transform: translateX(6px); }
+  40%  { clip-path: inset(15% 0 60% 0); transform: translateX(-8px); }
+  60%  { clip-path: inset(70% 0 5% 0); transform: translateX(4px); }
+  80%  { clip-path: inset(20% 0 50% 0); transform: translateX(-3px); }
+  100% { clip-path: inset(0 0 0 0); transform: translateX(0); }
+}
+
+/* ============================================
    FLOATING VIBE TOGGLE (background music player)
    ============================================ */
 .vibe-toggle {

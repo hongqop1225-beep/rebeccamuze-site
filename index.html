@@ -4,17 +4,49 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Rebecca Muze — Music Producer / Vocals</title>
-  <meta name="description" content="Rebecca Muze. Music producer & vocalist. New release dropping soon." />
+  <meta name="description" content="Rebecca Muze. Sydney-based music producer & vocalist. No fixed genre — just sound that makes you feel. New release dropping soon." />
+  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="author" content="Rebecca Muze" />
+
+  <!-- favicon (inline SVG ★ — sharp at any size) -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0a'/%3E%3Cpath d='M32 10 L37.6 26.2 L54.6 26.2 L40.9 36.2 L46.5 52.4 L32 42.4 L17.5 52.4 L23.1 36.2 L9.4 26.2 L26.4 26.2 Z' fill='%23d4ff3a'/%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0a'/%3E%3Cpath d='M32 10 L37.6 26.2 L54.6 26.2 L40.9 36.2 L46.5 52.4 L32 42.4 L17.5 52.4 L23.1 36.2 L9.4 26.2 L26.4 26.2 Z' fill='%23d4ff3a'/%3E%3C/svg%3E" />
+
+  <!-- Open Graph (Facebook, IG, WhatsApp, Discord, iMessage) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://rebeccamuze.club" />
+  <meta property="og:title" content="REBECCA MUZE — noise that feels." />
+  <meta property="og:description" content="Sydney-based producer & vocalist. No fixed genre — just sound that makes you feel. New drop imminent." />
+  <meta property="og:site_name" content="Rebecca Muze" />
+  <meta property="og:locale" content="en_AU" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="REBECCA MUZE — noise that feels." />
+  <meta name="twitter:description" content="Sydney-based producer & vocalist. No fixed genre. New drop imminent." />
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=Space+Mono:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=23" />
+  <link rel="stylesheet" href="style.css?v=24" />
   <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
   <script src="https://unpkg.com/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
   <div class="grain"></div>
   <div class="dotgrid"></div>
+
+  <!-- custom cursor (desktop only — hidden on touch) -->
+  <div class="cursor" aria-hidden="true">
+    <div class="cursor__dot"></div>
+    <div class="cursor__ring"></div>
+  </div>
+
+  <!-- live "in studio" indicator -->
+  <div class="status" aria-hidden="true">
+    <span class="status__dot"></span>
+    <span class="status__text" id="statusText">in the studio</span>
+  </div>
 
   <!-- ============================================
        BACKGROUND VIBE LOOP
@@ -199,6 +231,6 @@
     <span>made with ♥ + noise</span>
   </footer>
 
-  <script src="script.js?v=23"></script>
+  <script src="script.js?v=24"></script>
 </body>
 </html>
