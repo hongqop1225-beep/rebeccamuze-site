@@ -960,7 +960,34 @@ if (canvas) {
     btn.setAttribute('aria-label', 'play background music');
   }
 
+  // ----- skull pop burst ------------------------------------------
+  // little skull emoji puffs up from the button on every click,
+  // wobbles, then disappears. pure CSS keyframe driven.
+  function spawnSkullPop() {
+    const rect = btn.getBoundingClientRect();
+    // anchor near the top-center of the button so the skull rises up
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height * 0.35;
+    // tiny random horizontal drift so repeated clicks don't stack identically
+    const drift = (Math.random() - 0.5) * 40;
+    const tilt = (Math.random() - 0.5) * 30;
+
+    const el = document.createElement('div');
+    el.className = 'skull-pop';
+    el.textContent = '💀';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.setProperty('--drift', drift + 'px');
+    el.style.setProperty('--tilt', tilt + 'deg');
+    document.body.appendChild(el);
+    // clean up after animation finishes
+    el.addEventListener('animationend', () => el.remove(), { once: true });
+    // safety fallback in case animationend doesn't fire
+    setTimeout(() => el.remove(), 1400);
+  }
+
   btn.addEventListener('click', () => {
+    spawnSkullPop();
     if (audio.paused) {
       play();
     } else {
