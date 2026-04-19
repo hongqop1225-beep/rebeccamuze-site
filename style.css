@@ -1579,7 +1579,9 @@ body {
   }
 }
 
-/* the realistic skull image */
+/* the realistic skull image — recoloured lime via filter chain.
+   sepia normalises bone tones to yellow, hue-rotate shifts to lime,
+   high contrast crushes shadows to deep black for that toxic look. */
 .skull-burst__skull {
   position: absolute;
   left: 0;
@@ -1591,8 +1593,8 @@ body {
   pointer-events: none;
   opacity: 0;
   transform: translateY(0) scale(0.4) rotate(0deg);
-  /* lime electric glow around the skull silhouette */
   filter:
+    brightness(0.85) contrast(1.55) sepia(1) saturate(10) hue-rotate(38deg)
     drop-shadow(0 0 6px rgba(212, 255, 58, 0.95))
     drop-shadow(0 0 18px rgba(212, 255, 58, 0.6))
     drop-shadow(0 0 32px rgba(212, 255, 58, 0.35));
@@ -1604,18 +1606,21 @@ body {
     opacity: 0;
     transform: translateY(8px) scale(0.4) rotate(0deg);
     filter:
+      brightness(1) contrast(1.6) sepia(1) saturate(12) hue-rotate(38deg)
       drop-shadow(0 0 4px rgba(255, 255, 255, 0.95))
-      drop-shadow(0 0 8px rgba(212, 255, 58, 0.7))
+      drop-shadow(0 0 10px rgba(212, 255, 58, 0.8))
       blur(3px);
   }
-  /* electric jitter at the moment the rings burst */
+  /* electric flash at the moment the rings burst */
   10% {
     opacity: 1;
     transform: translateY(-2px) scale(1.18) rotate(calc(var(--tilt) * 0.6));
     filter:
-      drop-shadow(0 0 6px rgba(255, 255, 255, 1))
-      drop-shadow(0 0 22px rgba(212, 255, 58, 1))
-      drop-shadow(0 0 40px rgba(212, 255, 58, 0.6))
+      brightness(1.05) contrast(1.7) sepia(1) saturate(14) hue-rotate(38deg)
+      drop-shadow(0 0 8px rgba(255, 255, 255, 1))
+      drop-shadow(0 0 24px rgba(212, 255, 58, 1))
+      drop-shadow(0 0 44px rgba(212, 255, 58, 0.7))
+      drop-shadow(0 0 60px rgba(212, 255, 58, 0.4))
       blur(0px);
   }
   16% {
@@ -1624,29 +1629,32 @@ body {
   22% {
     transform: translateY(-1px) scale(1.1) rotate(calc(var(--tilt) * 0.3));
   }
-  /* settles + slow soft fade */
+  /* settles into steady lime glow */
   40% {
     opacity: 0.95;
     transform: translateY(-4px) scale(1) rotate(var(--tilt));
     filter:
-      drop-shadow(0 0 4px rgba(255, 255, 255, 0.8))
-      drop-shadow(0 0 16px rgba(212, 255, 58, 0.85))
-      drop-shadow(0 0 30px rgba(212, 255, 58, 0.5))
+      brightness(0.9) contrast(1.6) sepia(1) saturate(11) hue-rotate(38deg)
+      drop-shadow(0 0 5px rgba(255, 255, 255, 0.7))
+      drop-shadow(0 0 18px rgba(212, 255, 58, 0.9))
+      drop-shadow(0 0 34px rgba(212, 255, 58, 0.55))
       blur(0px);
   }
   75% {
-    opacity: 0.5;
+    opacity: 0.55;
     transform: translateY(-14px) scale(1.05) rotate(var(--tilt));
     filter:
-      drop-shadow(0 0 18px rgba(212, 255, 58, 0.55))
-      drop-shadow(0 0 30px rgba(212, 255, 58, 0.3))
+      brightness(0.85) contrast(1.55) sepia(1) saturate(10) hue-rotate(38deg)
+      drop-shadow(0 0 20px rgba(212, 255, 58, 0.6))
+      drop-shadow(0 0 32px rgba(212, 255, 58, 0.32))
       blur(2px);
   }
   100% {
     opacity: 0;
     transform: translateY(-28px) scale(1.12) rotate(var(--tilt));
     filter:
-      drop-shadow(0 0 24px rgba(212, 255, 58, 0.25))
+      brightness(0.85) contrast(1.55) sepia(1) saturate(10) hue-rotate(38deg)
+      drop-shadow(0 0 26px rgba(212, 255, 58, 0.25))
       blur(7px);
   }
 }
