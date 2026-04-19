@@ -855,3 +855,79 @@ if (canvas) {
     }
   });
 })();
+
+/* ============================================
+   BACKGROUND VIBE LOOP
+   - browsers block autoplay, so we wait for first click
+   - fade-in on play, fade-out on pause (smooth, not jarring)
+   - remembers state across scrolls (audio element persists)
+   ============================================ */
+(function initVibeLoop() {
+  const audio = document.getElementById('vibeAudio');
+  const btn = document.getElementById('vibeToggle');
+  if (!audio || !btn) return;
+
+  const TARGET_VOLUME = 0.55; // not too loud — background vibe
+  const FADE_MS = 900;
+  audio.volume = 0;
+
+  let fadeRAF = null;
+
+  function fadeTo(target, onDone) {
+    if (fadeRAF) cancelAnimationFrame(fadeRAF);
+    const start = audio.volume;
+    const diff = target - start;
+    const startTime = performance.now();
+    function step(now) {
+      const t = Math.min(1, (now - startTime) / FADE_MS);
+      audio.volume = Math.max(0, Math.min(1, start + diff * t));
+      if (t < 1) {
+        fadeRAF = requestAnimationFrame(step);
+      } else {
+        fadeRAF = null;
+        if (onDone) onDone();
+      }
+    }
+    fadeRAF = requestAnimationFrame(step);
+  }
+
+  async function play() {
+    try {
+      await audio.play();
+      btn.classList.add('is-playing');
+      btn.classList.remove('vibe-toggle--pulse');
+      btn.setAttribute('aria-pressed', 'true');
+      btn.setAttribute('aria-label', 'pause background music');
+      fadeTo(TARGET_VOLUME);
+    } catch (err) {
+      // autoplay blocked or file missing — silently fail, user can retry
+      console.warn('vibe loop play blocked:', err);
+    }
+  }
+
+  function pause() {
+    fadeTo(0, () => {
+      audio.pause();
+    });
+    btn.classList.remove('is-playing');
+    btn.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-label', 'play background music');
+  }
+
+  btn.addEventListener('click', () => {
+    if (audio.paused) {
+      play();
+    } else {
+      pause();
+    }
+  });
+
+  // gentle keyboard shortcut: press "M" to mute/unmute
+  document.addEventListener('keydown', (e) => {
+    if (e.key && e.key.toLowerCase() === 'm' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      const tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return; // don't hijack typing
+      btn.click();
+    }
+  });
+})();
