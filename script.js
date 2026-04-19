@@ -963,27 +963,68 @@ if (canvas) {
   // ----- skull pop burst ------------------------------------------
   // little skull emoji puffs up from the button on every click,
   // wobbles, then disappears. pure CSS keyframe driven.
+  // inline SVG skull — line-art style, takes currentColor + drop-shadow glow
+  const SKULL_SVG = `
+    <svg class="skull-pop__svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <radialGradient id="skullGrad" cx="50%" cy="40%" r="55%">
+          <stop offset="0%" stop-color="rgba(244,244,240,0.95)"/>
+          <stop offset="60%" stop-color="rgba(244,244,240,0.55)"/>
+          <stop offset="100%" stop-color="rgba(244,244,240,0)"/>
+        </radialGradient>
+      </defs>
+      <!-- soft inner glow halo -->
+      <circle cx="32" cy="30" r="22" fill="url(#skullGrad)" opacity="0.35"/>
+      <!-- skull body: cranium + jaw with teeth notches -->
+      <path d="M32 5 C19 5, 11 14, 11 27 L11 37 C11 41, 13 43, 16 44 L16 51
+               C16 53, 17.5 54.5, 19.5 54.5 L21.5 54.5 L21.5 50 L25.5 50
+               L25.5 54.5 L30 54.5 L30 50 L34 50 L34 54.5 L38.5 54.5
+               L38.5 50 L42.5 50 L42.5 54.5 L44.5 54.5 C46.5 54.5, 48 53, 48 51
+               L48 44 C51 43, 53 41, 53 37 L53 27 C53 14, 45 5, 32 5 Z"
+            fill="rgba(10,10,10,0.88)"
+            stroke="rgba(244,244,240,0.95)"
+            stroke-width="1.4"
+            stroke-linejoin="round"/>
+      <!-- eye sockets -->
+      <ellipse cx="22.5" cy="28" rx="5.2" ry="6.8" fill="#0a0a0a"
+               stroke="rgba(244,244,240,0.7)" stroke-width="0.8"/>
+      <ellipse cx="41.5" cy="28" rx="5.2" ry="6.8" fill="#0a0a0a"
+               stroke="rgba(244,244,240,0.7)" stroke-width="0.8"/>
+      <!-- tiny pupil sparks -->
+      <circle cx="22.5" cy="27" r="0.9" fill="rgba(212,255,58,0.95)"/>
+      <circle cx="41.5" cy="27" r="0.9" fill="rgba(212,255,58,0.95)"/>
+      <!-- nose triangle -->
+      <path d="M32 36 L28.5 43 L35.5 43 Z" fill="#0a0a0a"
+            stroke="rgba(244,244,240,0.7)" stroke-width="0.7"/>
+      <!-- jaw line + teeth -->
+      <line x1="20" y1="47" x2="44" y2="47" stroke="rgba(244,244,240,0.75)" stroke-width="0.9"/>
+      <line x1="26" y1="47" x2="26" y2="54" stroke="rgba(244,244,240,0.55)" stroke-width="0.6"/>
+      <line x1="30" y1="47" x2="30" y2="54" stroke="rgba(244,244,240,0.55)" stroke-width="0.6"/>
+      <line x1="34" y1="47" x2="34" y2="54" stroke="rgba(244,244,240,0.55)" stroke-width="0.6"/>
+      <line x1="38" y1="47" x2="38" y2="54" stroke="rgba(244,244,240,0.55)" stroke-width="0.6"/>
+    </svg>
+  `;
+
   function spawnSkullPop() {
     const rect = btn.getBoundingClientRect();
-    // anchor near the top-center of the button so the skull rises up
     const x = rect.left + rect.width / 2;
     const y = rect.top + rect.height * 0.35;
-    // tiny random horizontal drift so repeated clicks don't stack identically
     const drift = (Math.random() - 0.5) * 40;
-    const tilt = (Math.random() - 0.5) * 30;
+    const tilt = (Math.random() - 0.5) * 24;
 
     const el = document.createElement('div');
     el.className = 'skull-pop';
-    el.textContent = '💀';
+    el.innerHTML = SKULL_SVG;
     el.style.left = x + 'px';
     el.style.top = y + 'px';
     el.style.setProperty('--drift', drift + 'px');
     el.style.setProperty('--tilt', tilt + 'deg');
     document.body.appendChild(el);
-    // clean up after animation finishes
-    el.addEventListener('animationend', () => el.remove(), { once: true });
-    // safety fallback in case animationend doesn't fire
-    setTimeout(() => el.remove(), 1400);
+    el.addEventListener('animationend', (e) => {
+      // wait for the longest animation (the wrapper) before removing
+      if (e.target === el) el.remove();
+    });
+    setTimeout(() => el.remove(), 1600);
   }
 
   btn.addEventListener('click', () => {
