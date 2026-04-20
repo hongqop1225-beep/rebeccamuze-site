@@ -1842,6 +1842,16 @@ body.game-active .vibe-toggle,
 body.game-active .status,
 body.game-active .cursor { display: none !important; }
 body.game-active { overflow: hidden; }
+/* restore system cursor inside game — custom cursor is hidden, so we
+   need the OS pointer back or buttons feel unclickable */
+body.game-active,
+body.game-active * { cursor: auto !important; }
+body.game-active button,
+body.game-active a,
+body.game-active input,
+body.game-active [role="button"] { cursor: pointer !important; }
+/* the canvas itself stays crosshair-feeling */
+body.game-active .game-canvas { cursor: crosshair !important; }
 
 /* full-screen game mode */
 .game-mode {

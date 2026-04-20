@@ -1066,9 +1066,9 @@ if (canvas) {
   function tick() {
     // dot: snap
     dx = mx; dy = my;
-    // ring: ease toward mouse (lag)
-    rx += (mx - rx) * 0.18;
-    ry += (my - ry) * 0.18;
+    // ring: ease toward mouse (snappier lag — 0.35 keeps feel but not sluggish)
+    rx += (mx - rx) * 0.35;
+    ry += (my - ry) * 0.35;
 
     dot.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
     ring.style.transform = `translate3d(${rx}px, ${ry}px, 0)`;
