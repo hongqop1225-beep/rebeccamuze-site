@@ -1178,21 +1178,18 @@ if (canvas) {
 })();
 
 /* ============================================
-   SIMON — musical memory game.
-   Watch tiles light up in a pattern, repeat the pattern.
-   Each round adds one more note. One mistake = game over.
-   Leaderboard via Netlify Function (score = rounds survived).
+   FLAPPY SKULL — classic Flappy Bird gameplay.
+   Tap / click / space to flap. Dodge neon pipes.
+   Each pipe = +1 point. One hit = game over.
+   Leaderboard via Netlify Function.
    ============================================ */
-(function initSimonGame() {
+(function initFlappyGame() {
   const trigger = document.getElementById('gameTrigger');
   const mode = document.getElementById('gameMode');
-  const grid = document.getElementById('simonGrid');
-  if (!trigger || !mode || !grid) return;
+  const canvas = document.getElementById('flappyCanvas');
+  if (!trigger || !mode || !canvas) return;
 
-  const tiles = Array.from(grid.querySelectorAll('.simon-tile'));
-  const coreEl = document.getElementById('simonCore');
-  const statusEl = document.getElementById('simonStatus');
-  const roundEl = document.getElementById('simonRound');
+  const ctx = canvas.getContext('2d');
   const closeBtn = document.getElementById('gameClose');
   const introScreen = document.getElementById('gameIntro');
   const countdownScreen = document.getElementById('gameCountdown');
@@ -1210,28 +1207,60 @@ if (canvas) {
   const boardOver = document.getElementById('gameLeaderboardOver');
 
   // ---- state --------------------------------------------------
-  const STATE = { IDLE: 'idle', COUNT: 'count', PLAYBACK: 'playback', INPUT: 'input', OVER: 'over' };
+  const STATE = { IDLE: 'idle', COUNT: 'count', PLAY: 'play', OVER: 'over' };
   let state = STATE.IDLE;
 
-  // each tile's musical note (C5, E5, G5, C6 — a nice C major chord shape)
-  const NOTES = [523.25, 659.25, 783.99, 1046.50];
+  // world sized dynamically on resize
+  let W = 0, H = 0, dpr = 1;
 
-  let sequence = [];      // the pattern the player must repeat
-  let playerStep = 0;     // current index in the sequence during INPUT
-  let round = 0;          // which round we're on (also the score)
-  let best = 0;
+  // physics constants (tuned for 60fps feel)
+  const GRAVITY = 0.55;
+  const FLAP = -9.2;
+  const MAX_FALL = 14;
+  const SKULL_SIZE = 56;
+  const SKULL_X_RATIO = 0.28; // skull stays at 28% from left
+  const PIPE_W = 68;
+  const PIPE_GAP_BASE = 180;
+  const PIPE_SPACING = 260;   // horizontal distance between pipes
+  const SCROLL_BASE = 3.2;
+
+  // entities
+  const bird = { y: 0, vy: 0, rot: 0 };
+  let pipes = [];
+  let stars = [];
+  let score = 0, best = 0;
+  let scroll = SCROLL_BASE;
+  let shakeUntil = 0;
+  let lastFrame = 0;
+  let flashBurst = [];
+  let lastFinalScore = 0;
+
+  // skull sprite
+  const skullImg = new Image();
+  skullImg.src = 'skull.png?v=1';
+
+  // ---- sizing -------------------------------------------------
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    const r = mode.getBoundingClientRect();
+    W = r.width; H = r.height;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', () => { if (state !== STATE.IDLE) resize(); });
 
   // ---- best score ---------------------------------------------
   function loadBest() {
-    try { best = parseInt(localStorage.getItem('rm_simon_best') || '0', 10); }
+    try { best = parseInt(localStorage.getItem('rm_flappy_best') || '0', 10); }
     catch (_) { best = 0; }
   }
   function saveBest() {
-    try { localStorage.setItem('rm_simon_best', String(best)); } catch (_) {}
+    try { localStorage.setItem('rm_flappy_best', String(best)); } catch (_) {}
   }
   loadBest();
 
-  // ---- web audio — synthesize tones per tile ------------------
+  // ---- audio — flap + crash ----------------------------------
   let audioCtx = null;
   function ensureAudio() {
     if (audioCtx) return audioCtx;
@@ -1241,7 +1270,24 @@ if (canvas) {
     } catch (_) { audioCtx = null; }
     return audioCtx;
   }
-  function playTone(freq, duration) {
+  function flapSound() {
+    const ac = ensureAudio();
+    if (!ac) return;
+    if (ac.state === 'suspended') { try { ac.resume(); } catch (_) {} }
+    const now = ac.currentTime;
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(520, now);
+    osc.frequency.exponentialRampToValueAtTime(820, now + 0.08);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.18, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+    osc.connect(gain).connect(ac.destination);
+    osc.start(now);
+    osc.stop(now + 0.14);
+  }
+  function scoreSound() {
     const ac = ensureAudio();
     if (!ac) return;
     if (ac.state === 'suspended') { try { ac.resume(); } catch (_) {} }
@@ -1249,16 +1295,16 @@ if (canvas) {
     const osc = ac.createOscillator();
     const gain = ac.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, now);
-    // soft attack + decay — sounds less harsh than a square beep
+    osc.frequency.setValueAtTime(880, now);
+    osc.frequency.exponentialRampToValueAtTime(1320, now + 0.08);
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.22, now + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    gain.gain.linearRampToValueAtTime(0.12, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
     osc.connect(gain).connect(ac.destination);
     osc.start(now);
-    osc.stop(now + duration + 0.02);
+    osc.stop(now + 0.18);
   }
-  function playWrongTone() {
+  function crashSound() {
     const ac = ensureAudio();
     if (!ac) return;
     if (ac.state === 'suspended') { try { ac.resume(); } catch (_) {} }
@@ -1266,22 +1312,13 @@ if (canvas) {
     const osc = ac.createOscillator();
     const gain = ac.createGain();
     osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(180, now);
-    osc.frequency.linearRampToValueAtTime(60, now + 0.6);
-    gain.gain.setValueAtTime(0.22, now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.45);
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
     osc.connect(gain).connect(ac.destination);
     osc.start(now);
-    osc.stop(now + 0.75);
-  }
-
-  // ---- tile flashing ------------------------------------------
-  function flashTile(idx, duration) {
-    const tile = tiles[idx];
-    if (!tile) return;
-    tile.classList.add('is-lit');
-    playTone(NOTES[idx], duration / 1000);
-    setTimeout(() => { tile.classList.remove('is-lit'); }, duration);
+    osc.stop(now + 0.55);
   }
 
   // ---- leaderboard (Netlify Function) -------------------------
@@ -1343,6 +1380,8 @@ if (canvas) {
     mode.classList.add('is-active');
     mode.setAttribute('aria-hidden', 'false');
     document.body.classList.add('game-active');
+    // canvas needs to size after layout
+    requestAnimationFrame(() => resize());
     await fetchLeaderboard();
     renderLeaderboard(boardIntro, null);
     showIntro();
@@ -1402,98 +1441,80 @@ if (canvas) {
   }
 
   function startGame() {
-    sequence = [];
-    playerStep = 0;
-    round = 0;
+    resize();
+    score = 0;
+    bird.y = H * 0.4;
+    bird.vy = 0;
+    bird.rot = 0;
+    pipes = [];
+    flashBurst = [];
+    scroll = SCROLL_BASE;
+    // seed a couple of pipes ahead
+    for (let i = 0; i < 3; i++) {
+      spawnPipe(W + i * PIPE_SPACING);
+    }
+    // init starfield
+    stars = [];
+    for (let i = 0; i < 80; i++) {
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: Math.random() * 1.5 + 0.3,
+        vx: 0.2 + Math.random() * 0.8,
+      });
+    }
     scoreEl.textContent = '0';
-    roundEl.textContent = '00';
-    coreEl.classList.remove('is-bad', 'is-go');
-    statusEl.textContent = 'READY';
-    // give user a beat, then start round 1
-    setTimeout(nextRound, 700);
+    state = STATE.PLAY;
+    lastFrame = performance.now();
+    requestAnimationFrame(loop);
   }
 
-  function nextRound() {
-    round++;
-    sequence.push(Math.floor(Math.random() * 4));
-    scoreEl.textContent = String(round);
-    roundEl.textContent = String(round).padStart(2, '0');
-    coreEl.classList.remove('is-bad');
-    coreEl.classList.add('is-go');
-    statusEl.textContent = 'WATCH';
-    playSequence();
+  function spawnPipe(xPos) {
+    const minGapY = 90;
+    const maxGapY = H - 90;
+    const gap = Math.max(140, PIPE_GAP_BASE - score * 1.2);
+    const gapCenter = minGapY + gap/2 + Math.random() * (maxGapY - minGapY - gap);
+    pipes.push({
+      x: xPos,
+      gapTop: gapCenter - gap/2,
+      gapBot: gapCenter + gap/2,
+      scored: false,
+    });
   }
 
-  function playSequence() {
-    state = STATE.PLAYBACK;
-    grid.classList.add('is-locked');
-    playerStep = 0;
-
-    // speed up as rounds grow, floor at 260ms
-    const flashDur = Math.max(260, 600 - round * 18);
-    const gapDur   = Math.max(120, 260 - round * 6);
-
-    let i = 0;
-    const step = () => {
-      if (state !== STATE.PLAYBACK) return; // aborted (e.g. closed)
-      if (i >= sequence.length) {
-        // done — let the player go
-        state = STATE.INPUT;
-        grid.classList.remove('is-locked');
-        statusEl.textContent = 'YOUR TURN';
-        return;
-      }
-      flashTile(sequence[i], flashDur);
-      i++;
-      setTimeout(step, flashDur + gapDur);
-    };
-    setTimeout(step, 500);
-  }
-
-  function handleTilePress(idx) {
-    if (state !== STATE.INPUT) return;
-    // flash the user's tap
-    flashTile(idx, 260);
-
-    if (idx === sequence[playerStep]) {
-      playerStep++;
-      if (playerStep >= sequence.length) {
-        // round complete — pause, then next round
-        state = STATE.PLAYBACK;
-        grid.classList.add('is-locked');
-        statusEl.textContent = 'NICE';
-        setTimeout(nextRound, 800);
-      }
-    } else {
-      wrongAnswer(idx);
+  function flap() {
+    if (state !== STATE.PLAY) return;
+    bird.vy = FLAP;
+    flapSound();
+    // little puff
+    for (let i = 0; i < 6; i++) {
+      flashBurst.push({
+        x: W * SKULL_X_RATIO - 14,
+        y: bird.y + 12,
+        vx: -Math.random() * 2 - 1,
+        vy: Math.random() * 2 + 1,
+        life: 1,
+      });
     }
   }
 
-  function wrongAnswer(idx) {
+  function gameOver() {
     state = STATE.OVER;
-    grid.classList.add('is-locked');
-    const tile = tiles[idx];
-    if (tile) tile.classList.add('is-wrong');
-    coreEl.classList.remove('is-go');
-    coreEl.classList.add('is-bad');
-    statusEl.textContent = 'WRONG';
-    playWrongTone();
-    setTimeout(() => {
-      if (tile) tile.classList.remove('is-wrong');
-      endGame();
-    }, 900);
+    crashSound();
+    shakeUntil = performance.now() + 400;
+    // brief delay so crash shake can be seen before game-over screen
+    setTimeout(showGameOver, 650);
   }
 
-  function endGame() {
-    state = STATE.OVER;
-    const finalScore = Math.max(0, round - 1); // rounds successfully completed
-    const isNewBest = finalScore > best;
-    if (isNewBest) { best = finalScore; saveBest(); }
-    finalScoreEl.textContent = finalScore;
+  function showGameOver() {
+    const isNewBest = score > best;
+    if (isNewBest) { best = score; saveBest(); }
+    lastFinalScore = score;
+    finalScoreEl.textContent = score;
     bestLineEl.textContent = 'best: ' + best;
     bestLineEl.classList.toggle('is-new', isNewBest);
 
-    if (cracksLeaderboard(finalScore)) {
+    if (cracksLeaderboard(score)) {
       nameForm.hidden = false;
       try {
         const prev = localStorage.getItem('rm_game_name');
@@ -1505,22 +1526,194 @@ if (canvas) {
     }
     renderLeaderboard(boardOver, null);
     overScreen.hidden = false;
-    // stash for share + submit
-    lastFinalScore = finalScore;
   }
-  let lastFinalScore = 0;
 
-  // ---- tile input --------------------------------------------
-  tiles.forEach((tile) => {
-    const idx = parseInt(tile.dataset.tile, 10);
-    const onPress = (e) => {
+  // ---- main loop ---------------------------------------------
+  function loop(now) {
+    if (state !== STATE.PLAY) return;
+    const dt = Math.min(32, now - lastFrame) || 16;
+    lastFrame = now;
+    const step = dt / 16.67; // normalize to 60fps
+
+    // ---- background (black fade for light trail) ----
+    ctx.fillStyle = '#050505';
+    ctx.fillRect(0, 0, W, H);
+
+    // screen shake on crash
+    let shakeX = 0, shakeY = 0;
+    if (now < shakeUntil) {
+      shakeX = (Math.random() - 0.5) * 10;
+      shakeY = (Math.random() - 0.5) * 10;
+    }
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+
+    // ---- starfield ----
+    for (const s of stars) {
+      s.x -= s.vx * step;
+      if (s.x < -5) { s.x = W + 5; s.y = Math.random() * H; }
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = '#f4f4f0';
+      ctx.fillRect(s.x, s.y, s.r, s.r);
+    }
+    ctx.globalAlpha = 1;
+
+    // ---- difficulty ramp ----
+    scroll = SCROLL_BASE + Math.min(2.2, score * 0.08);
+
+    // ---- update + draw pipes ----
+    for (let i = pipes.length - 1; i >= 0; i--) {
+      const p = pipes[i];
+      p.x -= scroll * step;
+
+      // top pipe
+      drawPipe(p.x, 0, PIPE_W, p.gapTop, 'top');
+      // bottom pipe
+      drawPipe(p.x, p.gapBot, PIPE_W, H - p.gapBot, 'bot');
+
+      // score when bird passes
+      const bx = W * SKULL_X_RATIO;
+      if (!p.scored && p.x + PIPE_W < bx - SKULL_SIZE/2) {
+        p.scored = true;
+        score++;
+        scoreEl.textContent = String(score);
+        scoreSound();
+      }
+
+      // off-screen cleanup + spawn
+      if (p.x + PIPE_W < -10) {
+        pipes.splice(i, 1);
+      }
+    }
+    // keep spawning
+    const last = pipes[pipes.length - 1];
+    if (!last || last.x < W - PIPE_SPACING) {
+      spawnPipe((last ? last.x : W) + PIPE_SPACING);
+    }
+
+    // ---- update bird ----
+    bird.vy += GRAVITY * step;
+    if (bird.vy > MAX_FALL) bird.vy = MAX_FALL;
+    bird.y += bird.vy * step;
+    bird.rot = Math.max(-0.4, Math.min(1.2, bird.vy * 0.08));
+
+    // collide with floor / ceiling
+    if (bird.y + SKULL_SIZE/2 >= H - 4) {
+      bird.y = H - 4 - SKULL_SIZE/2;
+      ctx.restore();
+      gameOver();
+      return;
+    }
+    if (bird.y - SKULL_SIZE/2 < 0) {
+      bird.y = SKULL_SIZE/2;
+      bird.vy = 0;
+    }
+
+    // collide with pipes (AABB)
+    const bx = W * SKULL_X_RATIO;
+    const by = bird.y;
+    const br = SKULL_SIZE * 0.42; // slightly forgiving
+    for (const p of pipes) {
+      if (bx + br > p.x && bx - br < p.x + PIPE_W) {
+        if (by - br < p.gapTop || by + br > p.gapBot) {
+          ctx.restore();
+          gameOver();
+          return;
+        }
+      }
+    }
+
+    // ---- draw ground glow ----
+    const grd = ctx.createLinearGradient(0, H - 30, 0, H);
+    grd.addColorStop(0, 'rgba(212,255,58,0)');
+    grd.addColorStop(1, 'rgba(212,255,58,0.18)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, H - 30, W, 30);
+
+    // ---- draw flap puffs ----
+    for (let i = flashBurst.length - 1; i >= 0; i--) {
+      const f = flashBurst[i];
+      f.x += f.vx * step;
+      f.y += f.vy * step;
+      f.life -= 0.04 * step;
+      if (f.life <= 0) { flashBurst.splice(i, 1); continue; }
+      ctx.globalAlpha = f.life * 0.8;
+      ctx.fillStyle = '#d4ff3a';
+      ctx.fillRect(f.x, f.y, 3, 3);
+    }
+    ctx.globalAlpha = 1;
+
+    // ---- draw skull ----
+    ctx.save();
+    ctx.translate(bx, by);
+    ctx.rotate(bird.rot);
+    ctx.shadowColor = 'rgba(212,255,58,0.9)';
+    ctx.shadowBlur = 24;
+    if (skullImg.complete && skullImg.naturalWidth) {
+      ctx.filter = 'brightness(0.8) contrast(1.5) sepia(1) saturate(5) hue-rotate(38deg)';
+      ctx.drawImage(skullImg, -SKULL_SIZE/2, -SKULL_SIZE/2, SKULL_SIZE, SKULL_SIZE);
+      ctx.filter = 'none';
+    } else {
+      ctx.fillStyle = '#d4ff3a';
+      ctx.beginPath();
+      ctx.arc(0, 0, SKULL_SIZE/2, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // ---- big score text in center-top ----
+    ctx.save();
+    ctx.font = '700 48px "Bricolage Grotesque", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(244,244,240,0.85)';
+    ctx.shadowColor = 'rgba(212,255,58,0.6)';
+    ctx.shadowBlur = 18;
+    ctx.fillText(String(score), W / 2, 90);
+    ctx.restore();
+
+    ctx.restore();
+    requestAnimationFrame(loop);
+  }
+
+  function drawPipe(x, y, w, h, which) {
+    if (h <= 0) return;
+    ctx.save();
+    // body
+    const grd = ctx.createLinearGradient(x, 0, x + w, 0);
+    grd.addColorStop(0, '#0c1a00');
+    grd.addColorStop(0.5, '#1a3a00');
+    grd.addColorStop(1, '#0c1a00');
+    ctx.fillStyle = grd;
+    ctx.fillRect(x, y, w, h);
+    // lime outline + glow
+    ctx.strokeStyle = 'rgba(212,255,58,0.85)';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = 'rgba(212,255,58,0.9)';
+    ctx.shadowBlur = 14;
+    ctx.strokeRect(x + 1, y, w - 2, h);
+    // lip
+    const lipH = 14;
+    const lipY = which === 'top' ? y + h - lipH : y;
+    ctx.fillStyle = '#1f4500';
+    ctx.fillRect(x - 4, lipY, w + 8, lipH);
+    ctx.strokeRect(x - 4, lipY, w + 8, lipH);
+    ctx.restore();
+  }
+
+  // ---- input --------------------------------------------------
+  function handleFlap(e) {
+    if (e) e.preventDefault();
+    ensureAudio();
+    if (state === STATE.PLAY) flap();
+  }
+  canvas.addEventListener('mousedown', handleFlap);
+  canvas.addEventListener('touchstart', handleFlap, { passive: false });
+  document.addEventListener('keydown', (e) => {
+    if (!mode.classList.contains('is-active')) return;
+    if (e.code === 'Space' || e.key === ' ' || e.key === 'ArrowUp') {
       e.preventDefault();
-      // kick audio context on first user gesture
-      ensureAudio();
-      handleTilePress(idx);
-    };
-    tile.addEventListener('mousedown', onPress);
-    tile.addEventListener('touchstart', onPress, { passive: false });
+      handleFlap();
+    }
   });
 
   // ---- buttons -----------------------------------------------

@@ -28,7 +28,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=Space+Mono:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=35" />
+  <link rel="stylesheet" href="style.css?v=36" />
   <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
   <script src="https://unpkg.com/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
@@ -98,48 +98,37 @@
 
   <!-- full-screen game overlay (hidden by default) -->
   <div class="game-mode" id="gameMode" aria-hidden="true">
-    <!-- SIMON — musical memory. Watch the sequence. Repeat it. -->
-    <div class="simon-stage" id="simonStage">
-      <div class="simon-grid" id="simonGrid" aria-label="simon tiles">
-        <button type="button" class="simon-tile simon-tile--1" data-tile="0" aria-label="tile 1" tabindex="-1"></button>
-        <button type="button" class="simon-tile simon-tile--2" data-tile="1" aria-label="tile 2" tabindex="-1"></button>
-        <button type="button" class="simon-tile simon-tile--3" data-tile="2" aria-label="tile 3" tabindex="-1"></button>
-        <button type="button" class="simon-tile simon-tile--4" data-tile="3" aria-label="tile 4" tabindex="-1"></button>
-        <div class="simon-core" id="simonCore" aria-hidden="true">
-          <div class="simon-core__label" id="simonStatus">WATCH</div>
-          <div class="simon-core__round" id="simonRound">01</div>
-        </div>
-      </div>
-    </div>
+    <!-- FLAPPY SKULL — tap to flap, dodge pipes. -->
+    <canvas class="flappy-canvas" id="flappyCanvas"></canvas>
 
-    <!-- HUD: round, close -->
+    <!-- HUD: score, close -->
     <div class="game-hud" id="gameHud">
-      <div class="game-hud__title">▶ SIMON</div>
-      <div class="game-hud__score"><span class="game-hud__label">ROUND</span><span id="gameScore">0</span></div>
+      <div class="game-hud__title">▶ FLAPPY SKULL</div>
+      <div class="game-hud__score"><span class="game-hud__label">SCORE</span><span id="gameScore">0</span></div>
       <button type="button" class="game-hud__close" id="gameClose" aria-label="close game">✕</button>
     </div>
 
     <!-- intro / countdown screen -->
     <div class="game-screen game-screen--intro" id="gameIntro">
       <div class="game-screen__inner">
-        <div class="game-screen__tag">memory mode</div>
-        <h2 class="game-screen__title">repeat the<br/>noise<span class="dot">.</span></h2>
-        <div class="howto howto--simon">
-          <div class="howto__row">
-            <div class="howto__icon">👀</div>
-            <div class="howto__text"><strong>watch</strong> the tiles light up<br/>in a pattern</div>
-          </div>
-          <div class="howto__row">
-            <div class="howto__icon">👂</div>
-            <div class="howto__text"><strong>listen</strong> — each tile<br/>plays its own note</div>
-          </div>
+        <div class="game-screen__tag">arcade mode</div>
+        <h2 class="game-screen__title">flappy<br/>skull<span class="dot">.</span></h2>
+        <div class="howto howto--flappy">
           <div class="howto__row">
             <div class="howto__icon">👆</div>
-            <div class="howto__text"><strong>repeat</strong> the sequence<br/>in the exact order</div>
+            <div class="howto__text"><strong>tap / click / space</strong><br/>to flap up</div>
           </div>
           <div class="howto__row">
-            <div class="howto__icon">🎶</div>
-            <div class="howto__text">every round adds <strong>one more note</strong><br/>how far can you go?</div>
+            <div class="howto__icon">💀</div>
+            <div class="howto__text">fly through the <strong>gaps</strong><br/>in the neon pipes</div>
+          </div>
+          <div class="howto__row">
+            <div class="howto__icon">⚡</div>
+            <div class="howto__text">each pipe = <strong>+1 point</strong><br/>one hit = game over</div>
+          </div>
+          <div class="howto__row">
+            <div class="howto__icon">🏆</div>
+            <div class="howto__text">crack the <strong>top 10</strong><br/>live leaderboard</div>
           </div>
         </div>
         <div class="game-screen__leaderboard" id="gameLeaderboardIntro"></div>
@@ -163,9 +152,9 @@
     <!-- game over screen -->
     <div class="game-screen game-screen--over" id="gameOver" hidden>
       <div class="game-screen__inner">
-        <div class="game-screen__tag">you forgot the noise</div>
+        <div class="game-screen__tag">you crashed</div>
         <div class="game-screen__score">
-          <div class="game-screen__score-label">rounds survived</div>
+          <div class="game-screen__score-label">your score</div>
           <div class="game-screen__score-num" id="gameFinalScore">0</div>
           <div class="game-screen__best" id="gameBestLine">best: 0</div>
         </div>
@@ -343,6 +332,6 @@
     <span>made with ♥ + noise</span>
   </footer>
 
-  <script src="script.js?v=32"></script>
+  <script src="script.js?v=33"></script>
 </body>
 </html>
