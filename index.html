@@ -31,7 +31,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=Space+Mono:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=36" />
+  <link rel="stylesheet" href="style.css?v=37" />
   <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
   <script src="https://unpkg.com/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
@@ -247,20 +247,17 @@
       <p class="release-card__note">something new is cooking. drop your email — you'll be the first to know when it lands, and you'll get the <em>pre-save</em> link 2 weeks early.</p>
 
       <!-- ============================================
-           EMAIL CAPTURE — Netlify Forms (free, no backend)
-           Submissions appear in Netlify dashboard → Forms
+           EMAIL CAPTURE — Web3Forms (free, 250 submissions/mo)
+           Submissions are emailed to hong.qop1225@gmail.com.
+           Access key lives in data-access-key below; swap if rotated.
            ============================================ -->
       <form
-        name="next-drop"
-        method="POST"
-        data-netlify="true"
-        netlify-honeypot="bot-field"
         class="signup-form"
-        id="signupForm">
-        <input type="hidden" name="form-name" value="next-drop" />
+        id="signupForm"
+        data-access-key="REPLACE_WITH_WEB3FORMS_ACCESS_KEY">
         <!-- honeypot — hidden field to trap bots -->
         <p class="signup-form__honey" aria-hidden="true">
-          <label>Don't fill this out if you're human: <input name="bot-field" tabindex="-1" autocomplete="off" /></label>
+          <label>Don't fill this out if you're human: <input name="botcheck" tabindex="-1" autocomplete="off" /></label>
         </p>
         <div class="signup-form__row">
           <input
@@ -335,6 +332,6 @@
     <span>made with ♥ + noise</span>
   </footer>
 
-  <script src="script.js?v=33"></script>
+  <script src="script.js?v=34"></script>
 </body>
 </html>

@@ -822,17 +822,26 @@ if (canvas) {
 })();
 
 /* ============================================================
-   EMAIL SIGNUP — Netlify Forms AJAX submit
-   Intercepts the form, posts to Netlify, swaps in success message
-   (avoids full page redirect, keeps the vibe)
+   EMAIL SIGNUP — Web3Forms AJAX submit
+   Posts JSON to api.web3forms.com; submissions are emailed to
+   hong.qop1225@gmail.com. Access key lives on the form as
+   data-access-key (see index.html).
    ============================================================ */
 (function initSignup() {
   const form = document.getElementById('signupForm');
   const success = document.getElementById('signupSuccess');
   if (!form || !success) return;
 
+  const ENDPOINT = 'https://api.web3forms.com/submit';
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    const accessKey = form.dataset.accessKey;
+    if (!accessKey || accessKey.startsWith('REPLACE_')) {
+      alert("email form isn't configured yet — DM @rebecca_9muses on instagram instead 💌");
+      return;
+    }
 
     const submitBtn = form.querySelector('.signup-form__submit');
     const originalLabel = submitBtn ? submitBtn.textContent : '';
@@ -841,18 +850,29 @@ if (canvas) {
       submitBtn.textContent = 'sending…';
     }
 
-    const data = new FormData(form);
-    // Netlify forms require urlencoded body with form-name
-    const body = new URLSearchParams();
-    for (const [k, v] of data.entries()) body.append(k, v);
+    const emailInput = form.querySelector('input[name="email"]');
+    const botInput = form.querySelector('input[name="botcheck"]');
+    const payload = {
+      access_key: accessKey,
+      subject: 'New signup — rebeccamuze.club',
+      from_name: 'rebeccamuze.club',
+      email: emailInput ? emailInput.value : '',
+      botcheck: botInput ? botInput.value : '',
+    };
 
     try {
-      const res = await fetch('/', {
+      const res = await fetch(ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Network response was not ok');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        throw new Error(data.message || 'submit failed');
+      }
       // swap in success state
       form.hidden = true;
       success.hidden = false;
@@ -1321,8 +1341,8 @@ if (canvas) {
     osc.stop(now + 0.55);
   }
 
-  // ---- leaderboard (Netlify Function) -------------------------
-  const LB_ENDPOINT = '/.netlify/functions/leaderboard';
+  // ---- leaderboard (Cloudflare Pages Function) ----------------
+  const LB_ENDPOINT = '/api/leaderboard';
   let cachedLeaderboard = [];
 
   async function fetchLeaderboard() {
