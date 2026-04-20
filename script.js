@@ -1178,17 +1178,21 @@ if (canvas) {
 })();
 
 /* ============================================
-   DON'T LET THE SILENCE WIN — arcade game
-   Canvas 2D, requestAnimationFrame loop.
-   Leaderboard via Netlify Function.
+   SIMON — musical memory game.
+   Watch tiles light up in a pattern, repeat the pattern.
+   Each round adds one more note. One mistake = game over.
+   Leaderboard via Netlify Function (score = rounds survived).
    ============================================ */
-(function initSilenceGame() {
+(function initSimonGame() {
   const trigger = document.getElementById('gameTrigger');
   const mode = document.getElementById('gameMode');
-  const canvas = document.getElementById('gameCanvas');
-  if (!trigger || !mode || !canvas) return;
+  const grid = document.getElementById('simonGrid');
+  if (!trigger || !mode || !grid) return;
 
-  const ctx = canvas.getContext('2d');
+  const tiles = Array.from(grid.querySelectorAll('.simon-tile'));
+  const coreEl = document.getElementById('simonCore');
+  const statusEl = document.getElementById('simonStatus');
+  const roundEl = document.getElementById('simonRound');
   const closeBtn = document.getElementById('gameClose');
   const introScreen = document.getElementById('gameIntro');
   const countdownScreen = document.getElementById('gameCountdown');
@@ -1198,7 +1202,6 @@ if (canvas) {
   const retryBtn = document.getElementById('gameRetry');
   const shareBtn = document.getElementById('gameShare');
   const scoreEl = document.getElementById('gameScore');
-  const livesEl = document.getElementById('gameLives');
   const finalScoreEl = document.getElementById('gameFinalScore');
   const bestLineEl = document.getElementById('gameBestLine');
   const nameForm = document.getElementById('gameNameForm');
@@ -1206,53 +1209,80 @@ if (canvas) {
   const boardIntro = document.getElementById('gameLeaderboardIntro');
   const boardOver = document.getElementById('gameLeaderboardOver');
 
-  // ---- config -------------------------------------------------
-  const STATE = { IDLE: 'idle', COUNT: 'count', PLAY: 'play', OVER: 'over' };
+  // ---- state --------------------------------------------------
+  const STATE = { IDLE: 'idle', COUNT: 'count', PLAYBACK: 'playback', INPUT: 'input', OVER: 'over' };
   let state = STATE.IDLE;
 
-  const PLAYER = { y: 0, x: 0, targetX: 0, size: 60, speed: 0.22 };
-  const FOE = { size: 32 };
-  const BULLET = { w: 4, h: 18, speed: 12 };
-  const BONUS = { size: 38 };
+  // each tile's musical note (C5, E5, G5, C6 — a nice C major chord shape)
+  const NOTES = [523.25, 659.25, 783.99, 1046.50];
 
-  let foes = [], bullets = [], particles = [], bonuses = [];
-  let lives = 3, score = 0, best = 0;
-  let spawnTimer = 0, spawnInterval = 1000;
-  let bonusTimer = 0, bonusInterval = 6500;
-  let lastShot = 0;
-  let t0 = 0;
-  let W = 0, H = 0;
-  let dpr = 1;
-  let shakeUntil = 0;
-  let flashUntil = 0;
-
-  // preload skull image for player sprite
-  const skullImg = new Image();
-  skullImg.src = 'skull.png?v=1';
-
-  // ---- sizing -------------------------------------------------
-  function resize() {
-    dpr = window.devicePixelRatio || 1;
-    const r = mode.getBoundingClientRect();
-    W = r.width; H = r.height;
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    PLAYER.y = H - 90;
-    PLAYER.x = W / 2;
-    PLAYER.targetX = W / 2;
-  }
-  window.addEventListener('resize', () => { if (state !== STATE.IDLE) resize(); });
+  let sequence = [];      // the pattern the player must repeat
+  let playerStep = 0;     // current index in the sequence during INPUT
+  let round = 0;          // which round we're on (also the score)
+  let best = 0;
 
   // ---- best score ---------------------------------------------
   function loadBest() {
-    try { best = parseInt(localStorage.getItem('rm_game_best') || '0', 10); }
+    try { best = parseInt(localStorage.getItem('rm_simon_best') || '0', 10); }
     catch (_) { best = 0; }
   }
   function saveBest() {
-    try { localStorage.setItem('rm_game_best', String(best)); } catch (_) {}
+    try { localStorage.setItem('rm_simon_best', String(best)); } catch (_) {}
   }
   loadBest();
+
+  // ---- web audio — synthesize tones per tile ------------------
+  let audioCtx = null;
+  function ensureAudio() {
+    if (audioCtx) return audioCtx;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AC();
+    } catch (_) { audioCtx = null; }
+    return audioCtx;
+  }
+  function playTone(freq, duration) {
+    const ac = ensureAudio();
+    if (!ac) return;
+    if (ac.state === 'suspended') { try { ac.resume(); } catch (_) {} }
+    const now = ac.currentTime;
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now);
+    // soft attack + decay — sounds less harsh than a square beep
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.22, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    osc.connect(gain).connect(ac.destination);
+    osc.start(now);
+    osc.stop(now + duration + 0.02);
+  }
+  function playWrongTone() {
+    const ac = ensureAudio();
+    if (!ac) return;
+    if (ac.state === 'suspended') { try { ac.resume(); } catch (_) {} }
+    const now = ac.currentTime;
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(180, now);
+    osc.frequency.linearRampToValueAtTime(60, now + 0.6);
+    gain.gain.setValueAtTime(0.22, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+    osc.connect(gain).connect(ac.destination);
+    osc.start(now);
+    osc.stop(now + 0.75);
+  }
+
+  // ---- tile flashing ------------------------------------------
+  function flashTile(idx, duration) {
+    const tile = tiles[idx];
+    if (!tile) return;
+    tile.classList.add('is-lit');
+    playTone(NOTES[idx], duration / 1000);
+    setTimeout(() => { tile.classList.remove('is-lit'); }, duration);
+  }
 
   // ---- leaderboard (Netlify Function) -------------------------
   const LB_ENDPOINT = '/.netlify/functions/leaderboard';
@@ -1313,7 +1343,6 @@ if (canvas) {
     mode.classList.add('is-active');
     mode.setAttribute('aria-hidden', 'false');
     document.body.classList.add('game-active');
-    requestAnimationFrame(() => resize());
     await fetchLeaderboard();
     renderLeaderboard(boardIntro, null);
     showIntro();
@@ -1373,29 +1402,99 @@ if (canvas) {
   }
 
   function startGame() {
-    resize();
-    lives = 3; score = 0;
-    foes = []; bullets = []; particles = []; bonuses = [];
-    spawnTimer = 0; spawnInterval = 1050;
-    bonusTimer = 0; lastShot = 0;
-    updateHud();
-    state = STATE.PLAY;
-    t0 = performance.now();
-    requestAnimationFrame(loop);
+    sequence = [];
+    playerStep = 0;
+    round = 0;
+    scoreEl.textContent = '0';
+    roundEl.textContent = '00';
+    coreEl.classList.remove('is-bad', 'is-go');
+    statusEl.textContent = 'READY';
+    // give user a beat, then start round 1
+    setTimeout(nextRound, 700);
+  }
+
+  function nextRound() {
+    round++;
+    sequence.push(Math.floor(Math.random() * 4));
+    scoreEl.textContent = String(round);
+    roundEl.textContent = String(round).padStart(2, '0');
+    coreEl.classList.remove('is-bad');
+    coreEl.classList.add('is-go');
+    statusEl.textContent = 'WATCH';
+    playSequence();
+  }
+
+  function playSequence() {
+    state = STATE.PLAYBACK;
+    grid.classList.add('is-locked');
+    playerStep = 0;
+
+    // speed up as rounds grow, floor at 260ms
+    const flashDur = Math.max(260, 600 - round * 18);
+    const gapDur   = Math.max(120, 260 - round * 6);
+
+    let i = 0;
+    const step = () => {
+      if (state !== STATE.PLAYBACK) return; // aborted (e.g. closed)
+      if (i >= sequence.length) {
+        // done — let the player go
+        state = STATE.INPUT;
+        grid.classList.remove('is-locked');
+        statusEl.textContent = 'YOUR TURN';
+        return;
+      }
+      flashTile(sequence[i], flashDur);
+      i++;
+      setTimeout(step, flashDur + gapDur);
+    };
+    setTimeout(step, 500);
+  }
+
+  function handleTilePress(idx) {
+    if (state !== STATE.INPUT) return;
+    // flash the user's tap
+    flashTile(idx, 260);
+
+    if (idx === sequence[playerStep]) {
+      playerStep++;
+      if (playerStep >= sequence.length) {
+        // round complete — pause, then next round
+        state = STATE.PLAYBACK;
+        grid.classList.add('is-locked');
+        statusEl.textContent = 'NICE';
+        setTimeout(nextRound, 800);
+      }
+    } else {
+      wrongAnswer(idx);
+    }
+  }
+
+  function wrongAnswer(idx) {
+    state = STATE.OVER;
+    grid.classList.add('is-locked');
+    const tile = tiles[idx];
+    if (tile) tile.classList.add('is-wrong');
+    coreEl.classList.remove('is-go');
+    coreEl.classList.add('is-bad');
+    statusEl.textContent = 'WRONG';
+    playWrongTone();
+    setTimeout(() => {
+      if (tile) tile.classList.remove('is-wrong');
+      endGame();
+    }, 900);
   }
 
   function endGame() {
     state = STATE.OVER;
-    const isNewBest = score > best;
-    if (isNewBest) { best = score; saveBest(); }
-    finalScoreEl.textContent = score;
+    const finalScore = Math.max(0, round - 1); // rounds successfully completed
+    const isNewBest = finalScore > best;
+    if (isNewBest) { best = finalScore; saveBest(); }
+    finalScoreEl.textContent = finalScore;
     bestLineEl.textContent = 'best: ' + best;
     bestLineEl.classList.toggle('is-new', isNewBest);
 
-    // decide if user can enter leaderboard
-    if (cracksLeaderboard(score)) {
+    if (cracksLeaderboard(finalScore)) {
       nameForm.hidden = false;
-      // prefill with saved name if exists
       try {
         const prev = localStorage.getItem('rm_game_name');
         if (prev) nameInput.value = prev;
@@ -1406,297 +1505,46 @@ if (canvas) {
     }
     renderLeaderboard(boardOver, null);
     overScreen.hidden = false;
+    // stash for share + submit
+    lastFinalScore = finalScore;
   }
+  let lastFinalScore = 0;
 
-  // ---- HUD ---------------------------------------------------
-  function updateHud() {
-    scoreEl.textContent = score;
-    const dots = livesEl.querySelectorAll('.life');
-    dots.forEach((d, i) => d.classList.toggle('is-lost', i >= lives));
-  }
-
-  // ---- input -------------------------------------------------
-  function getInputX(e) {
-    const r = canvas.getBoundingClientRect();
-    const cx = (e.clientX != null ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0)) - r.left;
-    return cx;
-  }
-
-  canvas.addEventListener('mousemove', (e) => {
-    if (state !== STATE.PLAY) return;
-    PLAYER.targetX = getInputX(e);
+  // ---- tile input --------------------------------------------
+  tiles.forEach((tile) => {
+    const idx = parseInt(tile.dataset.tile, 10);
+    const onPress = (e) => {
+      e.preventDefault();
+      // kick audio context on first user gesture
+      ensureAudio();
+      handleTilePress(idx);
+    };
+    tile.addEventListener('mousedown', onPress);
+    tile.addEventListener('touchstart', onPress, { passive: false });
   });
-  canvas.addEventListener('touchmove', (e) => {
-    if (state !== STATE.PLAY) return;
-    PLAYER.targetX = getInputX(e);
-    e.preventDefault();
-  }, { passive: false });
-
-  function shoot() {
-    const now = performance.now();
-    if (now - lastShot < 130) return;
-    lastShot = now;
-    bullets.push({ x: PLAYER.x, y: PLAYER.y - 30, vy: -BULLET.speed });
-  }
-
-  canvas.addEventListener('mousedown', (e) => {
-    if (state !== STATE.PLAY) return;
-    PLAYER.targetX = getInputX(e);
-    shoot();
-  });
-  canvas.addEventListener('touchstart', (e) => {
-    if (state !== STATE.PLAY) return;
-    PLAYER.targetX = getInputX(e);
-    shoot();
-    e.preventDefault();
-  }, { passive: false });
-
-  // ---- spawning ----------------------------------------------
-  function spawnFoe() {
-    const x = 40 + Math.random() * (W - 80);
-    const speed = 1.6 + Math.min(3.8, score * 0.045);
-    foes.push({ x, y: -FOE.size, vy: speed, wobble: Math.random() * Math.PI * 2 });
-  }
-  function spawnBonus() {
-    const x = 60 + Math.random() * (W - 120);
-    bonuses.push({ x, y: -BONUS.size, vy: 1.9, spin: 0 });
-  }
-
-  // ---- particles ---------------------------------------------
-  function burst(x, y, color, count) {
-    for (let i = 0; i < (count || 12); i++) {
-      const a = Math.random() * Math.PI * 2;
-      const v = 1 + Math.random() * 4;
-      particles.push({
-        x, y,
-        vx: Math.cos(a) * v,
-        vy: Math.sin(a) * v,
-        life: 1,
-        color,
-      });
-    }
-  }
-
-  // ---- main loop ---------------------------------------------
-  function loop(now) {
-    if (state !== STATE.PLAY) return;
-    const dt = 16; // roughly fixed timestep
-
-    // clear with trail (fade the previous frame slightly for glow trails)
-    ctx.fillStyle = 'rgba(5, 5, 5, 0.28)';
-    ctx.fillRect(0, 0, W, H);
-
-    // screen shake
-    let shakeX = 0, shakeY = 0;
-    if (now < shakeUntil) {
-      shakeX = (Math.random() - 0.5) * 8;
-      shakeY = (Math.random() - 0.5) * 8;
-    }
-    ctx.save();
-    ctx.translate(shakeX, shakeY);
-
-    // lime flash overlay
-    if (now < flashUntil) {
-      ctx.fillStyle = 'rgba(212, 255, 58, 0.18)';
-      ctx.fillRect(0, 0, W, H);
-    }
-
-    // background dot grid (moving slowly)
-    const gridOff = (now * 0.02) % 40;
-    ctx.fillStyle = 'rgba(212, 255, 58, 0.08)';
-    for (let y = -40 + gridOff; y < H + 40; y += 40) {
-      for (let x = 20; x < W + 20; x += 40) {
-        ctx.fillRect(x, y, 1.5, 1.5);
-      }
-    }
-
-    // player x lerps toward target
-    PLAYER.x += (PLAYER.targetX - PLAYER.x) * PLAYER.speed;
-    PLAYER.x = Math.max(PLAYER.size/2, Math.min(W - PLAYER.size/2, PLAYER.x));
-
-    // spawn foes
-    spawnTimer += dt;
-    spawnInterval = Math.max(340, 1050 - score * 10);
-    if (spawnTimer >= spawnInterval) {
-      spawnTimer = 0;
-      spawnFoe();
-      // chance to double up at higher scores
-      if (score > 20 && Math.random() < 0.25) spawnFoe();
-    }
-
-    // spawn bonus
-    bonusTimer += dt;
-    if (bonusTimer > bonusInterval) {
-      bonusTimer = 0;
-      spawnBonus();
-    }
-
-    // update + draw foes (black silence blocks with ✕)
-    for (let i = foes.length - 1; i >= 0; i--) {
-      const f = foes[i];
-      f.y += f.vy;
-      f.wobble += 0.05;
-      const wx = f.x + Math.sin(f.wobble) * 6;
-
-      // draw cube
-      ctx.save();
-      ctx.translate(wx, f.y);
-      ctx.shadowColor = 'rgba(255,80,80,0.4)';
-      ctx.shadowBlur = 12;
-      ctx.fillStyle = '#111';
-      ctx.strokeStyle = 'rgba(244,80,80,0.55)';
-      ctx.lineWidth = 1.5;
-      ctx.fillRect(-FOE.size/2, -FOE.size/2, FOE.size, FOE.size);
-      ctx.strokeRect(-FOE.size/2, -FOE.size/2, FOE.size, FOE.size);
-      // ✕
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = 'rgba(244,80,80,0.85)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(-8, -8); ctx.lineTo(8, 8);
-      ctx.moveTo(8, -8); ctx.lineTo(-8, 8);
-      ctx.stroke();
-      ctx.restore();
-
-      // off bottom = life lost
-      if (f.y - FOE.size/2 > H) {
-        foes.splice(i, 1);
-        lives--;
-        updateHud();
-        shakeUntil = now + 250;
-        // red burst
-        burst(wx, H - 20, 'rgba(244,80,80,1)', 16);
-        if (lives <= 0) { endGame(); ctx.restore(); return; }
-      }
-    }
-
-    // update + draw bonuses (lime skulls)
-    for (let i = bonuses.length - 1; i >= 0; i--) {
-      const b = bonuses[i];
-      b.y += b.vy;
-      b.spin += 0.04;
-
-      ctx.save();
-      ctx.translate(b.x, b.y);
-      ctx.rotate(Math.sin(b.spin) * 0.3);
-      ctx.shadowColor = 'rgba(212,255,58,0.95)';
-      ctx.shadowBlur = 22;
-      if (skullImg.complete && skullImg.naturalWidth) {
-        ctx.filter = 'brightness(0.8) contrast(1.5) sepia(1) saturate(6) hue-rotate(38deg)';
-        ctx.drawImage(skullImg, -BONUS.size/2, -BONUS.size/2, BONUS.size, BONUS.size);
-        ctx.filter = 'none';
-      } else {
-        ctx.fillStyle = '#d4ff3a';
-        ctx.beginPath();
-        ctx.arc(0, 0, BONUS.size/2, 0, Math.PI*2);
-        ctx.fill();
-      }
-      ctx.restore();
-
-      if (b.y - BONUS.size/2 > H) bonuses.splice(i, 1);
-    }
-
-    // update + draw bullets (lime lasers)
-    for (let i = bullets.length - 1; i >= 0; i--) {
-      const bu = bullets[i];
-      bu.y += bu.vy;
-      ctx.save();
-      ctx.shadowColor = 'rgba(212,255,58,1)';
-      ctx.shadowBlur = 18;
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(bu.x - BULLET.w/2, bu.y - BULLET.h/2, BULLET.w, BULLET.h);
-      ctx.fillStyle = '#d4ff3a';
-      ctx.fillRect(bu.x - BULLET.w/2 - 1, bu.y - BULLET.h/2 + 2, BULLET.w + 2, BULLET.h - 4);
-      ctx.restore();
-      if (bu.y < -30) bullets.splice(i, 1);
-    }
-
-    // collisions bullets x foes
-    for (let i = bullets.length - 1; i >= 0; i--) {
-      const bu = bullets[i]; if (!bu) continue;
-      for (let j = foes.length - 1; j >= 0; j--) {
-        const f = foes[j]; if (!f) continue;
-        const wx = f.x + Math.sin(f.wobble) * 6;
-        if (Math.abs(bu.x - wx) < FOE.size/2 && Math.abs(bu.y - f.y) < FOE.size/2) {
-          bullets.splice(i, 1);
-          foes.splice(j, 1);
-          score++;
-          updateHud();
-          burst(wx, f.y, 'rgba(212,255,58,1)', 14);
-          flashUntil = now + 60;
-          break;
-        }
-      }
-    }
-    // collisions bullets x bonuses
-    for (let i = bullets.length - 1; i >= 0; i--) {
-      const bu = bullets[i]; if (!bu) continue;
-      for (let j = bonuses.length - 1; j >= 0; j--) {
-        const b = bonuses[j]; if (!b) continue;
-        if (Math.abs(bu.x - b.x) < BONUS.size/2 && Math.abs(bu.y - b.y) < BONUS.size/2) {
-          bullets.splice(i, 1);
-          bonuses.splice(j, 1);
-          score += 10;
-          updateHud();
-          burst(b.x, b.y, 'rgba(212,255,58,1)', 34);
-          burst(b.x, b.y, 'rgba(255,255,255,1)', 10);
-          flashUntil = now + 260;
-          shakeUntil = now + 200;
-          break;
-        }
-      }
-    }
-
-    // particles
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
-      p.x += p.vx; p.y += p.vy;
-      p.vy += 0.08; p.vx *= 0.98;
-      p.life -= 0.025;
-      if (p.life <= 0) { particles.splice(i, 1); continue; }
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, p.life);
-      ctx.shadowColor = p.color;
-      ctx.shadowBlur = 12;
-      ctx.fillStyle = p.color;
-      ctx.fillRect(p.x, p.y, 3, 3);
-      ctx.restore();
-    }
-
-    // player skull
-    ctx.save();
-    ctx.translate(PLAYER.x, PLAYER.y);
-    const bob = Math.sin(now * 0.006) * 3;
-    ctx.translate(0, bob);
-    ctx.shadowColor = 'rgba(212,255,58,0.9)';
-    ctx.shadowBlur = 26;
-    if (skullImg.complete && skullImg.naturalWidth) {
-      ctx.filter = 'brightness(0.8) contrast(1.5) sepia(1) saturate(5) hue-rotate(38deg)';
-      ctx.drawImage(skullImg, -PLAYER.size/2, -PLAYER.size/2, PLAYER.size, PLAYER.size);
-      ctx.filter = 'none';
-    } else {
-      ctx.fillStyle = '#d4ff3a';
-      ctx.beginPath();
-      ctx.arc(0, 0, PLAYER.size/2, 0, Math.PI*2);
-      ctx.fill();
-    }
-    ctx.restore();
-
-    ctx.restore();
-    requestAnimationFrame(loop);
-  }
 
   // ---- buttons -----------------------------------------------
   trigger.addEventListener('click', () => { openGame(); });
   closeBtn.addEventListener('click', () => { closeGame(); });
-  startBtn.addEventListener('click', () => { startCountdown(); });
-  retryBtn.addEventListener('click', () => { overScreen.hidden = true; startCountdown(); });
+  startBtn.addEventListener('click', () => {
+    ensureAudio();
+    startCountdown();
+  });
+  retryBtn.addEventListener('click', () => {
+    ensureAudio();
+    overScreen.hidden = true;
+    startCountdown();
+  });
+  // back-to-site buttons (data-close-game)
+  document.querySelectorAll('[data-close-game]').forEach((b) => {
+    b.addEventListener('click', () => closeGame());
+  });
 
   shareBtn.addEventListener('click', async () => {
     const url = 'https://rebeccamuze.club';
-    const text = `I survived ${score} in Rebecca Muze's noise 💀 beat me: ${url}`;
+    const text = `I hit ROUND ${lastFinalScore} in Rebecca Muze's SIMON 🎶 beat me: ${url}`;
     if (navigator.share) {
-      try { await navigator.share({ title: 'REBECCA MUZE', text, url }); return; } catch (_) {}
+      try { await navigator.share({ title: 'REBECCA MUZE — SIMON', text, url }); return; } catch (_) {}
     }
     try { await navigator.clipboard.writeText(text); shareBtn.textContent = 'COPIED!'; setTimeout(()=> shareBtn.textContent = 'SHARE', 1400); }
     catch (_) { alert(text); }
@@ -1707,13 +1555,12 @@ if (canvas) {
     const name = (nameInput.value || 'anon').trim().toUpperCase().replace(/[^A-Z0-9 _-]/g, '').slice(0, 12) || 'ANON';
     try { localStorage.setItem('rm_game_name', name); } catch (_) {}
     nameForm.hidden = true;
-    await submitScore(name, score);
-    // mark my row and re-render
+    await submitScore(name, lastFinalScore);
     cachedLeaderboard = cachedLeaderboard.map(s => {
-      if (s.name === name && s.score === score) return { ...s, _me: true };
+      if (s.name === name && s.score === lastFinalScore) return { ...s, _me: true };
       return s;
     });
-    renderLeaderboard(boardOver, score);
+    renderLeaderboard(boardOver, lastFinalScore);
   });
 
   // escape closes
