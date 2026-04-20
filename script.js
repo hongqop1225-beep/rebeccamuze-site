@@ -1010,6 +1010,11 @@ if (canvas) {
     }
   });
 
+  // expose play() so the press-play gate can trigger music with its own
+  // user-gesture (browsers require a gesture to start audio — the gate
+  // click counts as one).
+  window.__vibePlay = play;
+
   // gentle keyboard shortcut: press "M" to mute/unmute
   document.addEventListener('keydown', (e) => {
     if (e.key && e.key.toLowerCase() === 'm' && !e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -1119,4 +1124,55 @@ if (canvas) {
       el.style.opacity = '1';
     }, 400);
   }, 7000);
+})();
+
+/* ============================================
+   PRESS PLAY GATE
+   - shown on first load, dismissed on click
+   - click also kicks off the vibe music (uses the
+     user gesture browsers require for audio).
+   ============================================ */
+(function initEnterGate() {
+  const gate = document.getElementById('enterGate');
+  const btn = document.getElementById('enterGateBtn');
+  if (!gate || !btn) return;
+
+  // skip the gate within the same browser session (so internal refresh
+  // / back navigation doesn't re-show it). first visit = always shown.
+  if (sessionStorage.getItem('rm_gate_dismissed') === '1') {
+    gate.remove();
+    document.body.classList.remove('enter-gate-locked');
+    return;
+  }
+
+  document.body.classList.add('enter-gate-locked');
+
+  function dismiss() {
+    if (gate.classList.contains('is-dismissed')) return;
+    gate.classList.add('is-dismissed');
+    document.body.classList.remove('enter-gate-locked');
+    sessionStorage.setItem('rm_gate_dismissed', '1');
+    // start the vibe music using this click as the user gesture
+    if (typeof window.__vibePlay === 'function') {
+      try { window.__vibePlay(); } catch (e) { /* ignore */ }
+    }
+    // remove from DOM after fade-out so it doesn't intercept anything
+    setTimeout(() => gate.remove(), 900);
+  }
+
+  // primary trigger: click the button
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dismiss();
+  });
+  // also dismiss on click anywhere in the gate (more forgiving on mobile)
+  gate.addEventListener('click', dismiss);
+  // keyboard: Enter / Space activates it too
+  document.addEventListener('keydown', (e) => {
+    if (gate.classList.contains('is-dismissed')) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      dismiss();
+    }
+  });
 })();

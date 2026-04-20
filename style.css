@@ -1673,6 +1673,134 @@ body {
   }
 }
 
+/* ============================================
+   PRESS PLAY ENTER GATE
+   - full-screen black overlay shown on first load
+   - giant lime ▶ button, click dismisses + starts music
+   ============================================ */
+.enter-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(
+    ellipse at center,
+    #0a0a0a 0%,
+    #050505 60%,
+    #000 100%
+  );
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1),
+              visibility 0s linear 0s;
+  visibility: visible;
+}
+.enter-gate.is-dismissed {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1),
+              visibility 0s linear 0.7s;
+}
+/* lock body scroll while gate is up */
+body.enter-gate-locked {
+  overflow: hidden;
+}
+
+.enter-gate__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.enter-gate__btn {
+  position: relative;
+  width: clamp(110px, 16vw, 160px);
+  height: clamp(110px, 16vw, 160px);
+  border-radius: 50%;
+  border: 2px solid rgba(212, 255, 58, 0.95);
+  background: rgba(10, 10, 10, 0.4);
+  color: #d4ff3a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow:
+    0 0 30px rgba(212, 255, 58, 0.55),
+    inset 0 0 30px rgba(212, 255, 58, 0.18);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.35s ease;
+  isolation: isolate;
+}
+.enter-gate__btn:hover {
+  transform: scale(1.06);
+  box-shadow:
+    0 0 50px rgba(212, 255, 58, 0.85),
+    inset 0 0 40px rgba(212, 255, 58, 0.3);
+}
+.enter-gate__btn:active { transform: scale(0.96); }
+
+.enter-gate__icon {
+  width: 38%;
+  height: 38%;
+  margin-left: 6%; /* optical center the triangle */
+  filter: drop-shadow(0 0 8px rgba(212, 255, 58, 0.85));
+}
+
+/* expanding rings around the play button — perpetual pulse */
+.enter-gate__btn-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(212, 255, 58, 0.5);
+  pointer-events: none;
+  animation: gate-ring 2.4s cubic-bezier(0.22, 0.85, 0.3, 1) infinite;
+  z-index: -1;
+}
+.enter-gate__btn-ring--2 { animation-delay: 1.2s; }
+
+@keyframes gate-ring {
+  0%   { transform: scale(1);   opacity: 0.7; border-width: 2px; }
+  70%  { opacity: 0.15; }
+  100% { transform: scale(1.85); opacity: 0; border-width: 0.5px; }
+}
+
+.enter-gate__label {
+  position: relative;
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(0.85rem, 2vw, 1.05rem);
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: rgba(244, 244, 240, 0.95);
+  margin-top: 0.4rem;
+  text-shadow: 0 0 18px rgba(212, 255, 58, 0.35);
+  animation: gate-text-flicker 5.5s ease-in-out infinite;
+}
+@keyframes gate-text-flicker {
+  0%, 92%, 100% { opacity: 1; }
+  93% { opacity: 0.4; }
+  94% { opacity: 1; }
+  95% { opacity: 0.6; }
+  96% { opacity: 1; }
+}
+
+.enter-gate__sub {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(0.62rem, 1.3vw, 0.72rem);
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(244, 244, 240, 0.45);
+}
+
+@media (max-width: 520px) {
+  .enter-gate__inner { gap: 1.1rem; }
+}
+
 /* respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

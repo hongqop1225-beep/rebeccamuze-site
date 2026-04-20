@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>lost in the noise — REBECCA MUZE</title>
+  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a0a'/%3E%3Ctext x='16' y='23' font-size='22' text-anchor='middle' fill='%23d4ff3a' font-family='sans-serif'%3E%E2%98%85%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      min-height: 100vh;
+      background: #0a0a0a;
+      color: #f4f4f0;
+      font-family: 'Space Mono', monospace;
+      overflow-x: hidden;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      position: relative;
+    }
+    /* subtle grain texture */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      pointer-events: none;
+      opacity: 0.06;
+      z-index: 1;
+      background-image:
+        repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(255,255,255,0.5) 2px, rgba(255,255,255,0.5) 3px);
+      mix-blend-mode: overlay;
+    }
+    /* faint scanlines */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      background:
+        radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 100%);
+    }
+    .lost {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.6rem;
+      text-align: center;
+      max-width: 540px;
+    }
+    .lost__skull {
+      width: clamp(140px, 28vw, 220px);
+      height: auto;
+      filter:
+        brightness(0.8) contrast(1.5) sepia(1) saturate(5) hue-rotate(38deg)
+        drop-shadow(0 0 14px rgba(212, 255, 58, 0.7))
+        drop-shadow(0 0 32px rgba(212, 255, 58, 0.35));
+      animation: lost-glitch 4s ease-in-out infinite;
+    }
+    @keyframes lost-glitch {
+      0%, 88%, 100% { transform: translate(0,0) scale(1); }
+      90% { transform: translate(-3px, 1px) scale(1.02); filter: brightness(0.8) contrast(1.7) sepia(1) saturate(7) hue-rotate(38deg) drop-shadow(0 0 18px rgba(212,255,58,1)); }
+      91% { transform: translate(2px, -1px) scale(0.99); }
+      93% { transform: translate(-2px, 0) scale(1.01); }
+      95% { transform: translate(0,0) scale(1); }
+    }
+    .lost__title {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 800;
+      font-size: clamp(2rem, 6vw, 3.4rem);
+      letter-spacing: -0.03em;
+      line-height: 0.95;
+      color: #f4f4f0;
+      text-shadow: 0 0 28px rgba(212, 255, 58, 0.18);
+      animation: lost-text 6s ease-in-out infinite;
+    }
+    @keyframes lost-text {
+      0%, 90%, 100% { opacity: 1; transform: translateX(0); }
+      92% { opacity: 0.6; transform: translateX(-2px); }
+      94% { opacity: 1; transform: translateX(2px); }
+      96% { opacity: 0.85; transform: translateX(-1px); }
+    }
+    .lost__code {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.42em;
+      text-transform: uppercase;
+      color: rgba(244, 244, 240, 0.45);
+    }
+    .lost__text {
+      font-size: 0.92rem;
+      line-height: 1.6;
+      color: rgba(244, 244, 240, 0.7);
+      max-width: 380px;
+    }
+    .lost__back {
+      margin-top: 0.8rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.85rem 1.4rem;
+      background: transparent;
+      border: 1.5px solid rgba(212, 255, 58, 0.85);
+      border-radius: 999px;
+      color: #d4ff3a;
+      text-decoration: none;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 0 0 rgba(212, 255, 58, 0);
+    }
+    .lost__back:hover {
+      background: rgba(212, 255, 58, 0.12);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(212, 255, 58, 0.25),
+                  0 0 30px rgba(212, 255, 58, 0.4);
+    }
+    .lost__back:active { transform: translateY(0); }
+    .lost__arrow {
+      display: inline-block;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .lost__back:hover .lost__arrow { transform: translateX(-4px); }
+  </style>
+</head>
+<body>
+  <main class="lost">
+    <img class="lost__skull" src="/skull.png" alt="" aria-hidden="true" />
+    <div class="lost__code">404 — signal lost</div>
+    <h1 class="lost__title">you got lost<br/>in the noise.</h1>
+    <p class="lost__text">this page doesn't exist (yet). maybe it never did. maybe it's still being mixed.</p>
+    <a class="lost__back" href="/">
+      <span class="lost__arrow">←</span> back to the noise
+    </a>
+  </main>
+</body>
+</html>
