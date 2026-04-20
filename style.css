@@ -2032,6 +2032,9 @@ body.game-active .simon-tile { cursor: pointer !important; }
   background: rgba(10, 10, 10, 0.7);
   backdrop-filter: blur(8px);
 }
+/* CRITICAL: `hidden` attribute must actually hide these — otherwise
+   game-over stacks on top of intro the moment the overlay opens. */
+.game-screen[hidden] { display: none !important; }
 .game-screen__inner {
   max-width: 440px;
   width: 100%;
