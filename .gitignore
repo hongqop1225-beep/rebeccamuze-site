@@ -23,3 +23,4 @@ npm-debug.log*
 # dependency caches (if you ever add node tooling)
 node_modules/
 .cache/
+.netlify/

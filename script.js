@@ -1176,3 +1176,548 @@ if (canvas) {
     }
   });
 })();
+
+/* ============================================
+   DON'T LET THE SILENCE WIN — arcade game
+   Canvas 2D, requestAnimationFrame loop.
+   Leaderboard via Netlify Function.
+   ============================================ */
+(function initSilenceGame() {
+  const trigger = document.getElementById('gameTrigger');
+  const mode = document.getElementById('gameMode');
+  const canvas = document.getElementById('gameCanvas');
+  if (!trigger || !mode || !canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  const closeBtn = document.getElementById('gameClose');
+  const introScreen = document.getElementById('gameIntro');
+  const countdownScreen = document.getElementById('gameCountdown');
+  const countNum = document.getElementById('gameCountNum');
+  const overScreen = document.getElementById('gameOver');
+  const startBtn = document.getElementById('gameStart');
+  const retryBtn = document.getElementById('gameRetry');
+  const shareBtn = document.getElementById('gameShare');
+  const scoreEl = document.getElementById('gameScore');
+  const livesEl = document.getElementById('gameLives');
+  const finalScoreEl = document.getElementById('gameFinalScore');
+  const bestLineEl = document.getElementById('gameBestLine');
+  const nameForm = document.getElementById('gameNameForm');
+  const nameInput = document.getElementById('gameNameInput');
+  const boardIntro = document.getElementById('gameLeaderboardIntro');
+  const boardOver = document.getElementById('gameLeaderboardOver');
+
+  // ---- config -------------------------------------------------
+  const STATE = { IDLE: 'idle', COUNT: 'count', PLAY: 'play', OVER: 'over' };
+  let state = STATE.IDLE;
+
+  const PLAYER = { y: 0, x: 0, targetX: 0, size: 60, speed: 0.22 };
+  const FOE = { size: 32 };
+  const BULLET = { w: 4, h: 18, speed: 12 };
+  const BONUS = { size: 38 };
+
+  let foes = [], bullets = [], particles = [], bonuses = [];
+  let lives = 3, score = 0, best = 0;
+  let spawnTimer = 0, spawnInterval = 1000;
+  let bonusTimer = 0, bonusInterval = 6500;
+  let lastShot = 0;
+  let t0 = 0;
+  let W = 0, H = 0;
+  let dpr = 1;
+  let shakeUntil = 0;
+  let flashUntil = 0;
+
+  // preload skull image for player sprite
+  const skullImg = new Image();
+  skullImg.src = 'skull.png?v=1';
+
+  // ---- sizing -------------------------------------------------
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    const r = mode.getBoundingClientRect();
+    W = r.width; H = r.height;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    PLAYER.y = H - 90;
+    PLAYER.x = W / 2;
+    PLAYER.targetX = W / 2;
+  }
+  window.addEventListener('resize', () => { if (state !== STATE.IDLE) resize(); });
+
+  // ---- best score ---------------------------------------------
+  function loadBest() {
+    try { best = parseInt(localStorage.getItem('rm_game_best') || '0', 10); }
+    catch (_) { best = 0; }
+  }
+  function saveBest() {
+    try { localStorage.setItem('rm_game_best', String(best)); } catch (_) {}
+  }
+  loadBest();
+
+  // ---- leaderboard (Netlify Function) -------------------------
+  const LB_ENDPOINT = '/.netlify/functions/leaderboard';
+  let cachedLeaderboard = [];
+
+  async function fetchLeaderboard() {
+    try {
+      const res = await fetch(LB_ENDPOINT, { method: 'GET' });
+      if (!res.ok) throw new Error('fetch failed');
+      const data = await res.json();
+      cachedLeaderboard = Array.isArray(data.scores) ? data.scores : [];
+    } catch (e) {
+      cachedLeaderboard = [];
+    }
+  }
+
+  async function submitScore(name, scr) {
+    try {
+      await fetch(LB_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.slice(0, 12), score: scr }),
+      });
+      await fetchLeaderboard();
+    } catch (e) { /* ignore */ }
+  }
+
+  function renderLeaderboard(container, myScore) {
+    if (!container) return;
+    if (!cachedLeaderboard.length) {
+      container.innerHTML = '<div class="game-screen__leaderboard-title">— leaderboard —</div><div class="leaderboard-empty">be the first to make the board 🏆</div>';
+      return;
+    }
+    const rows = cachedLeaderboard.slice(0, 10).map((s, i) => {
+      const isMe = myScore != null && s.score === myScore && s._me;
+      return `<div class="leaderboard-row${isMe ? ' is-me' : ''}">
+        <span class="leaderboard-row__rank">${i + 1}</span>
+        <span class="leaderboard-row__name">${escapeHtml(s.name)}</span>
+        <span class="leaderboard-row__score">${s.score}</span>
+      </div>`;
+    }).join('');
+    container.innerHTML = `<div class="game-screen__leaderboard-title">— leaderboard —</div>${rows}`;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+
+  function cracksLeaderboard(scr) {
+    if (scr <= 0) return false;
+    if (cachedLeaderboard.length < 10) return true;
+    const lowest = cachedLeaderboard[cachedLeaderboard.length - 1];
+    return scr > (lowest ? lowest.score : 0);
+  }
+
+  // ---- game control ------------------------------------------
+  async function openGame() {
+    mode.classList.add('is-active');
+    mode.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('game-active');
+    requestAnimationFrame(() => resize());
+    await fetchLeaderboard();
+    renderLeaderboard(boardIntro, null);
+    showIntro();
+    // boost vibe music if paused
+    if (typeof window.__vibePlay === 'function') {
+      try { window.__vibePlay(); } catch (_) {}
+    }
+  }
+
+  function closeGame() {
+    state = STATE.IDLE;
+    mode.classList.remove('is-active');
+    mode.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('game-active');
+  }
+
+  function showIntro() {
+    introScreen.hidden = false;
+    introScreen.style.display = '';
+    countdownScreen.hidden = true;
+    overScreen.hidden = true;
+    nameForm.hidden = true;
+    state = STATE.IDLE;
+  }
+
+  function startCountdown() {
+    introScreen.hidden = true;
+    overScreen.hidden = true;
+    countdownScreen.hidden = false;
+    state = STATE.COUNT;
+    let n = 3;
+    countNum.textContent = n;
+    // restart the animation
+    countNum.style.animation = 'none';
+    countNum.offsetHeight;
+    countNum.style.animation = '';
+    const tick = () => {
+      n--;
+      if (n > 0) {
+        countNum.textContent = n;
+        countNum.style.animation = 'none';
+        countNum.offsetHeight;
+        countNum.style.animation = '';
+        setTimeout(tick, 900);
+      } else {
+        countNum.textContent = 'GO';
+        countNum.style.animation = 'none';
+        countNum.offsetHeight;
+        countNum.style.animation = '';
+        setTimeout(() => {
+          countdownScreen.hidden = true;
+          startGame();
+        }, 700);
+      }
+    };
+    setTimeout(tick, 900);
+  }
+
+  function startGame() {
+    resize();
+    lives = 3; score = 0;
+    foes = []; bullets = []; particles = []; bonuses = [];
+    spawnTimer = 0; spawnInterval = 1050;
+    bonusTimer = 0; lastShot = 0;
+    updateHud();
+    state = STATE.PLAY;
+    t0 = performance.now();
+    requestAnimationFrame(loop);
+  }
+
+  function endGame() {
+    state = STATE.OVER;
+    const isNewBest = score > best;
+    if (isNewBest) { best = score; saveBest(); }
+    finalScoreEl.textContent = score;
+    bestLineEl.textContent = 'best: ' + best;
+    bestLineEl.classList.toggle('is-new', isNewBest);
+
+    // decide if user can enter leaderboard
+    if (cracksLeaderboard(score)) {
+      nameForm.hidden = false;
+      // prefill with saved name if exists
+      try {
+        const prev = localStorage.getItem('rm_game_name');
+        if (prev) nameInput.value = prev;
+      } catch (_) {}
+      setTimeout(() => nameInput.focus(), 300);
+    } else {
+      nameForm.hidden = true;
+    }
+    renderLeaderboard(boardOver, null);
+    overScreen.hidden = false;
+  }
+
+  // ---- HUD ---------------------------------------------------
+  function updateHud() {
+    scoreEl.textContent = score;
+    const dots = livesEl.querySelectorAll('.life');
+    dots.forEach((d, i) => d.classList.toggle('is-lost', i >= lives));
+  }
+
+  // ---- input -------------------------------------------------
+  function getInputX(e) {
+    const r = canvas.getBoundingClientRect();
+    const cx = (e.clientX != null ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0)) - r.left;
+    return cx;
+  }
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (state !== STATE.PLAY) return;
+    PLAYER.targetX = getInputX(e);
+  });
+  canvas.addEventListener('touchmove', (e) => {
+    if (state !== STATE.PLAY) return;
+    PLAYER.targetX = getInputX(e);
+    e.preventDefault();
+  }, { passive: false });
+
+  function shoot() {
+    const now = performance.now();
+    if (now - lastShot < 130) return;
+    lastShot = now;
+    bullets.push({ x: PLAYER.x, y: PLAYER.y - 30, vy: -BULLET.speed });
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (state !== STATE.PLAY) return;
+    PLAYER.targetX = getInputX(e);
+    shoot();
+  });
+  canvas.addEventListener('touchstart', (e) => {
+    if (state !== STATE.PLAY) return;
+    PLAYER.targetX = getInputX(e);
+    shoot();
+    e.preventDefault();
+  }, { passive: false });
+
+  // ---- spawning ----------------------------------------------
+  function spawnFoe() {
+    const x = 40 + Math.random() * (W - 80);
+    const speed = 1.6 + Math.min(3.8, score * 0.045);
+    foes.push({ x, y: -FOE.size, vy: speed, wobble: Math.random() * Math.PI * 2 });
+  }
+  function spawnBonus() {
+    const x = 60 + Math.random() * (W - 120);
+    bonuses.push({ x, y: -BONUS.size, vy: 1.9, spin: 0 });
+  }
+
+  // ---- particles ---------------------------------------------
+  function burst(x, y, color, count) {
+    for (let i = 0; i < (count || 12); i++) {
+      const a = Math.random() * Math.PI * 2;
+      const v = 1 + Math.random() * 4;
+      particles.push({
+        x, y,
+        vx: Math.cos(a) * v,
+        vy: Math.sin(a) * v,
+        life: 1,
+        color,
+      });
+    }
+  }
+
+  // ---- main loop ---------------------------------------------
+  function loop(now) {
+    if (state !== STATE.PLAY) return;
+    const dt = 16; // roughly fixed timestep
+
+    // clear with trail (fade the previous frame slightly for glow trails)
+    ctx.fillStyle = 'rgba(5, 5, 5, 0.28)';
+    ctx.fillRect(0, 0, W, H);
+
+    // screen shake
+    let shakeX = 0, shakeY = 0;
+    if (now < shakeUntil) {
+      shakeX = (Math.random() - 0.5) * 8;
+      shakeY = (Math.random() - 0.5) * 8;
+    }
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+
+    // lime flash overlay
+    if (now < flashUntil) {
+      ctx.fillStyle = 'rgba(212, 255, 58, 0.18)';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // background dot grid (moving slowly)
+    const gridOff = (now * 0.02) % 40;
+    ctx.fillStyle = 'rgba(212, 255, 58, 0.08)';
+    for (let y = -40 + gridOff; y < H + 40; y += 40) {
+      for (let x = 20; x < W + 20; x += 40) {
+        ctx.fillRect(x, y, 1.5, 1.5);
+      }
+    }
+
+    // player x lerps toward target
+    PLAYER.x += (PLAYER.targetX - PLAYER.x) * PLAYER.speed;
+    PLAYER.x = Math.max(PLAYER.size/2, Math.min(W - PLAYER.size/2, PLAYER.x));
+
+    // spawn foes
+    spawnTimer += dt;
+    spawnInterval = Math.max(340, 1050 - score * 10);
+    if (spawnTimer >= spawnInterval) {
+      spawnTimer = 0;
+      spawnFoe();
+      // chance to double up at higher scores
+      if (score > 20 && Math.random() < 0.25) spawnFoe();
+    }
+
+    // spawn bonus
+    bonusTimer += dt;
+    if (bonusTimer > bonusInterval) {
+      bonusTimer = 0;
+      spawnBonus();
+    }
+
+    // update + draw foes (black silence blocks with ✕)
+    for (let i = foes.length - 1; i >= 0; i--) {
+      const f = foes[i];
+      f.y += f.vy;
+      f.wobble += 0.05;
+      const wx = f.x + Math.sin(f.wobble) * 6;
+
+      // draw cube
+      ctx.save();
+      ctx.translate(wx, f.y);
+      ctx.shadowColor = 'rgba(255,80,80,0.4)';
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = '#111';
+      ctx.strokeStyle = 'rgba(244,80,80,0.55)';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(-FOE.size/2, -FOE.size/2, FOE.size, FOE.size);
+      ctx.strokeRect(-FOE.size/2, -FOE.size/2, FOE.size, FOE.size);
+      // ✕
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(244,80,80,0.85)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-8, -8); ctx.lineTo(8, 8);
+      ctx.moveTo(8, -8); ctx.lineTo(-8, 8);
+      ctx.stroke();
+      ctx.restore();
+
+      // off bottom = life lost
+      if (f.y - FOE.size/2 > H) {
+        foes.splice(i, 1);
+        lives--;
+        updateHud();
+        shakeUntil = now + 250;
+        // red burst
+        burst(wx, H - 20, 'rgba(244,80,80,1)', 16);
+        if (lives <= 0) { endGame(); ctx.restore(); return; }
+      }
+    }
+
+    // update + draw bonuses (lime skulls)
+    for (let i = bonuses.length - 1; i >= 0; i--) {
+      const b = bonuses[i];
+      b.y += b.vy;
+      b.spin += 0.04;
+
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(Math.sin(b.spin) * 0.3);
+      ctx.shadowColor = 'rgba(212,255,58,0.95)';
+      ctx.shadowBlur = 22;
+      if (skullImg.complete && skullImg.naturalWidth) {
+        ctx.filter = 'brightness(0.8) contrast(1.5) sepia(1) saturate(6) hue-rotate(38deg)';
+        ctx.drawImage(skullImg, -BONUS.size/2, -BONUS.size/2, BONUS.size, BONUS.size);
+        ctx.filter = 'none';
+      } else {
+        ctx.fillStyle = '#d4ff3a';
+        ctx.beginPath();
+        ctx.arc(0, 0, BONUS.size/2, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      if (b.y - BONUS.size/2 > H) bonuses.splice(i, 1);
+    }
+
+    // update + draw bullets (lime lasers)
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const bu = bullets[i];
+      bu.y += bu.vy;
+      ctx.save();
+      ctx.shadowColor = 'rgba(212,255,58,1)';
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(bu.x - BULLET.w/2, bu.y - BULLET.h/2, BULLET.w, BULLET.h);
+      ctx.fillStyle = '#d4ff3a';
+      ctx.fillRect(bu.x - BULLET.w/2 - 1, bu.y - BULLET.h/2 + 2, BULLET.w + 2, BULLET.h - 4);
+      ctx.restore();
+      if (bu.y < -30) bullets.splice(i, 1);
+    }
+
+    // collisions bullets x foes
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const bu = bullets[i]; if (!bu) continue;
+      for (let j = foes.length - 1; j >= 0; j--) {
+        const f = foes[j]; if (!f) continue;
+        const wx = f.x + Math.sin(f.wobble) * 6;
+        if (Math.abs(bu.x - wx) < FOE.size/2 && Math.abs(bu.y - f.y) < FOE.size/2) {
+          bullets.splice(i, 1);
+          foes.splice(j, 1);
+          score++;
+          updateHud();
+          burst(wx, f.y, 'rgba(212,255,58,1)', 14);
+          flashUntil = now + 60;
+          break;
+        }
+      }
+    }
+    // collisions bullets x bonuses
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const bu = bullets[i]; if (!bu) continue;
+      for (let j = bonuses.length - 1; j >= 0; j--) {
+        const b = bonuses[j]; if (!b) continue;
+        if (Math.abs(bu.x - b.x) < BONUS.size/2 && Math.abs(bu.y - b.y) < BONUS.size/2) {
+          bullets.splice(i, 1);
+          bonuses.splice(j, 1);
+          score += 10;
+          updateHud();
+          burst(b.x, b.y, 'rgba(212,255,58,1)', 34);
+          burst(b.x, b.y, 'rgba(255,255,255,1)', 10);
+          flashUntil = now + 260;
+          shakeUntil = now + 200;
+          break;
+        }
+      }
+    }
+
+    // particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx; p.y += p.vy;
+      p.vy += 0.08; p.vx *= 0.98;
+      p.life -= 0.025;
+      if (p.life <= 0) { particles.splice(i, 1); continue; }
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x, p.y, 3, 3);
+      ctx.restore();
+    }
+
+    // player skull
+    ctx.save();
+    ctx.translate(PLAYER.x, PLAYER.y);
+    const bob = Math.sin(now * 0.006) * 3;
+    ctx.translate(0, bob);
+    ctx.shadowColor = 'rgba(212,255,58,0.9)';
+    ctx.shadowBlur = 26;
+    if (skullImg.complete && skullImg.naturalWidth) {
+      ctx.filter = 'brightness(0.8) contrast(1.5) sepia(1) saturate(5) hue-rotate(38deg)';
+      ctx.drawImage(skullImg, -PLAYER.size/2, -PLAYER.size/2, PLAYER.size, PLAYER.size);
+      ctx.filter = 'none';
+    } else {
+      ctx.fillStyle = '#d4ff3a';
+      ctx.beginPath();
+      ctx.arc(0, 0, PLAYER.size/2, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.restore();
+    requestAnimationFrame(loop);
+  }
+
+  // ---- buttons -----------------------------------------------
+  trigger.addEventListener('click', () => { openGame(); });
+  closeBtn.addEventListener('click', () => { closeGame(); });
+  startBtn.addEventListener('click', () => { startCountdown(); });
+  retryBtn.addEventListener('click', () => { overScreen.hidden = true; startCountdown(); });
+
+  shareBtn.addEventListener('click', async () => {
+    const url = 'https://rebeccamuze.club';
+    const text = `I survived ${score} in Rebecca Muze's noise 💀 beat me: ${url}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'REBECCA MUZE', text, url }); return; } catch (_) {}
+    }
+    try { await navigator.clipboard.writeText(text); shareBtn.textContent = 'COPIED!'; setTimeout(()=> shareBtn.textContent = 'SHARE', 1400); }
+    catch (_) { alert(text); }
+  });
+
+  nameForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = (nameInput.value || 'anon').trim().toUpperCase().replace(/[^A-Z0-9 _-]/g, '').slice(0, 12) || 'ANON';
+    try { localStorage.setItem('rm_game_name', name); } catch (_) {}
+    nameForm.hidden = true;
+    await submitScore(name, score);
+    // mark my row and re-render
+    cachedLeaderboard = cachedLeaderboard.map(s => {
+      if (s.name === name && s.score === score) return { ...s, _me: true };
+      return s;
+    });
+    renderLeaderboard(boardOver, score);
+  });
+
+  // escape closes
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && mode.classList.contains('is-active')) closeGame();
+  });
+})();

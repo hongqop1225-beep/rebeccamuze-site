@@ -28,7 +28,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=Space+Mono:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=31" />
+  <link rel="stylesheet" href="style.css?v=32" />
   <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
   <script src="https://unpkg.com/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
@@ -87,6 +87,70 @@
     </span>
     <span class="vibe-toggle__label">vibe</span>
   </button>
+
+  <!-- play the noise — game trigger (bottom-left sibling to vibe toggle) -->
+  <button type="button" id="gameTrigger" class="game-trigger" aria-label="play the noise game">
+    <svg class="game-trigger__icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M8 5v14l11-7z" fill="currentColor"/>
+    </svg>
+    <span class="game-trigger__label">play the noise</span>
+  </button>
+
+  <!-- full-screen game overlay (hidden by default) -->
+  <div class="game-mode" id="gameMode" aria-hidden="true">
+    <canvas class="game-canvas" id="gameCanvas"></canvas>
+
+    <!-- HUD: lives, score, best -->
+    <div class="game-hud" id="gameHud">
+      <div class="game-hud__lives" id="gameLives">
+        <span class="life"></span><span class="life"></span><span class="life"></span>
+      </div>
+      <div class="game-hud__score"><span class="game-hud__label">SCORE</span><span id="gameScore">0</span></div>
+      <button type="button" class="game-hud__close" id="gameClose" aria-label="close game">✕</button>
+    </div>
+
+    <!-- intro / countdown screen -->
+    <div class="game-screen game-screen--intro" id="gameIntro">
+      <div class="game-screen__inner">
+        <div class="game-screen__tag">arcade mode</div>
+        <h2 class="game-screen__title">don't let the<br/>silence win</h2>
+        <p class="game-screen__sub">tap anywhere to shoot.<br/>miss 3 = game over.</p>
+        <div class="game-screen__leaderboard" id="gameLeaderboardIntro"></div>
+        <button type="button" class="game-screen__btn" id="gameStart">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+          START
+        </button>
+      </div>
+    </div>
+
+    <!-- countdown 3 2 1 -->
+    <div class="game-screen game-screen--countdown" id="gameCountdown" hidden>
+      <div class="game-screen__count" id="gameCountNum">3</div>
+    </div>
+
+    <!-- game over screen -->
+    <div class="game-screen game-screen--over" id="gameOver" hidden>
+      <div class="game-screen__inner">
+        <div class="game-screen__tag">the silence won</div>
+        <div class="game-screen__score">
+          <div class="game-screen__score-label">your score</div>
+          <div class="game-screen__score-num" id="gameFinalScore">0</div>
+          <div class="game-screen__best" id="gameBestLine">best: 0</div>
+        </div>
+        <!-- nickname form appears only when user cracks leaderboard -->
+        <form class="game-screen__name" id="gameNameForm" hidden>
+          <label for="gameNameInput">🏆 new leaderboard entry — enter your name:</label>
+          <input id="gameNameInput" type="text" maxlength="12" placeholder="your name" autocomplete="off" />
+          <button type="submit" class="game-screen__btn game-screen__btn--small">SAVE</button>
+        </form>
+        <div class="game-screen__leaderboard" id="gameLeaderboardOver"></div>
+        <div class="game-screen__btns">
+          <button type="button" class="game-screen__btn" id="gameRetry">▶ REVENGE</button>
+          <button type="button" class="game-screen__btn game-screen__btn--ghost" id="gameShare">SHARE</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <nav class="nav">
     <span class="nav__logo">★ RM</span>
@@ -246,6 +310,6 @@
     <span>made with ♥ + noise</span>
   </footer>
 
-  <script src="script.js?v=29"></script>
+  <script src="script.js?v=30"></script>
 </body>
 </html>
