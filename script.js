@@ -1225,6 +1225,7 @@ if (canvas) {
   const nameInput = document.getElementById('gameNameInput');
   const boardIntro = document.getElementById('gameLeaderboardIntro');
   const boardOver = document.getElementById('gameLeaderboardOver');
+  const livesEl = document.getElementById('gameLives');
 
   // ---- state --------------------------------------------------
   const STATE = { IDLE: 'idle', COUNT: 'count', PLAY: 'play', OVER: 'over' };
@@ -1254,6 +1255,9 @@ if (canvas) {
   let lastFrame = 0;
   let flashBurst = [];
   let lastFinalScore = 0;
+  const MAX_LIVES = 3;
+  let lives = MAX_LIVES;
+  let invincibleUntil = 0; // brief i-frames after losing a life
 
   // skull sprite
   const skullImg = new Image();
@@ -1463,6 +1467,9 @@ if (canvas) {
   function startGame() {
     resize();
     score = 0;
+    lives = MAX_LIVES;
+    invincibleUntil = 0;
+    updateLivesUI();
     bird.y = H * 0.4;
     bird.vy = 0;
     bird.rot = 0;
@@ -1518,10 +1525,49 @@ if (canvas) {
     }
   }
 
+  function updateLivesUI() {
+    if (!livesEl) return;
+    const icons = livesEl.querySelectorAll('.life');
+    icons.forEach((el, i) => {
+      el.classList.toggle('is-lost', i >= lives);
+    });
+  }
+
+  /**
+   * Lose a life. If any remain, respawn mid-screen with brief i-frames
+   * and clear the pipes near the bird so you don't instantly re-die.
+   * Only when lives hit 0 do we call gameOver().
+   */
+  function loseLife() {
+    // ignore hits during i-frames
+    if (performance.now() < invincibleUntil) return;
+
+    lives = Math.max(0, lives - 1);
+    updateLivesUI();
+    crashSound();
+    shakeUntil = performance.now() + 350;
+
+    if (lives <= 0) {
+      gameOver();
+      return;
+    }
+
+    // respawn: center-ish, zero velocity, clear pipes in the collision zone
+    bird.y = H * 0.4;
+    bird.vy = 0;
+    bird.rot = 0;
+    const bx = W * SKULL_X_RATIO;
+    pipes = pipes.filter(p => (p.x + PIPE_W < bx - SKULL_SIZE) || (p.x > bx + SKULL_SIZE * 2));
+    // re-seed a pipe further ahead if we cleared too many
+    if (pipes.length < 2) {
+      const last = pipes[pipes.length - 1];
+      spawnPipe((last ? last.x : W) + PIPE_SPACING);
+    }
+    invincibleUntil = performance.now() + 1200; // 1.2s of safety
+  }
+
   function gameOver() {
     state = STATE.OVER;
-    crashSound();
-    shakeUntil = performance.now() + 400;
     // brief delay so crash shake can be seen before game-over screen
     setTimeout(showGameOver, 650);
   }
@@ -1621,7 +1667,11 @@ if (canvas) {
     if (bird.y + SKULL_SIZE/2 >= H - 4) {
       bird.y = H - 4 - SKULL_SIZE/2;
       ctx.restore();
-      gameOver();
+      loseLife();
+      if (state !== STATE.PLAY) return;
+      // still alive — resume loop next frame
+      lastFrame = now;
+      requestAnimationFrame(loop);
       return;
     }
     if (bird.y - SKULL_SIZE/2 < 0) {
@@ -1629,16 +1679,22 @@ if (canvas) {
       bird.vy = 0;
     }
 
-    // collide with pipes (AABB)
-    const bx = W * SKULL_X_RATIO;
-    const by = bird.y;
-    const br = SKULL_SIZE * 0.42; // slightly forgiving
-    for (const p of pipes) {
-      if (bx + br > p.x && bx - br < p.x + PIPE_W) {
-        if (by - br < p.gapTop || by + br > p.gapBot) {
-          ctx.restore();
-          gameOver();
-          return;
+    // collide with pipes (AABB) — skip during i-frames
+    const invincible = now < invincibleUntil;
+    if (!invincible) {
+      const bx = W * SKULL_X_RATIO;
+      const by = bird.y;
+      const br = SKULL_SIZE * 0.42; // slightly forgiving
+      for (const p of pipes) {
+        if (bx + br > p.x && bx - br < p.x + PIPE_W) {
+          if (by - br < p.gapTop || by + br > p.gapBot) {
+            ctx.restore();
+            loseLife();
+            if (state !== STATE.PLAY) return;
+            lastFrame = now;
+            requestAnimationFrame(loop);
+            return;
+          }
         }
       }
     }
@@ -1664,20 +1720,25 @@ if (canvas) {
     ctx.globalAlpha = 1;
 
     // ---- draw skull ----
+    // during i-frames the skull blinks so you can tell you're safe
+    const iFrames = now < invincibleUntil;
+    const blinkHide = iFrames && (Math.floor(now / 90) % 2 === 0);
     ctx.save();
     ctx.translate(bx, by);
     ctx.rotate(bird.rot);
-    ctx.shadowColor = 'rgba(212,255,58,0.9)';
-    ctx.shadowBlur = 24;
-    if (skullImg.complete && skullImg.naturalWidth) {
-      ctx.filter = 'brightness(0.8) contrast(1.5) sepia(1) saturate(5) hue-rotate(38deg)';
-      ctx.drawImage(skullImg, -SKULL_SIZE/2, -SKULL_SIZE/2, SKULL_SIZE, SKULL_SIZE);
-      ctx.filter = 'none';
-    } else {
-      ctx.fillStyle = '#d4ff3a';
-      ctx.beginPath();
-      ctx.arc(0, 0, SKULL_SIZE/2, 0, Math.PI*2);
-      ctx.fill();
+    ctx.shadowColor = iFrames ? 'rgba(244,80,80,0.9)' : 'rgba(212,255,58,0.9)';
+    ctx.shadowBlur = iFrames ? 30 : 24;
+    if (!blinkHide) {
+      if (skullImg.complete && skullImg.naturalWidth) {
+        ctx.filter = 'brightness(0.8) contrast(1.5) sepia(1) saturate(5) hue-rotate(38deg)';
+        ctx.drawImage(skullImg, -SKULL_SIZE/2, -SKULL_SIZE/2, SKULL_SIZE, SKULL_SIZE);
+        ctx.filter = 'none';
+      } else {
+        ctx.fillStyle = '#d4ff3a';
+        ctx.beginPath();
+        ctx.arc(0, 0, SKULL_SIZE/2, 0, Math.PI*2);
+        ctx.fill();
+      }
     }
     ctx.restore();
 

@@ -1999,7 +1999,23 @@ body.game-active .flappy-canvas { cursor: pointer !important; }
   pointer-events: none;
   z-index: 5;
 }
-/* (legacy shooter lives styles removed — simon uses .game-hud__title) */
+/* lives display — 3 skulls, fade as you lose them */
+.game-hud__lives {
+  display: flex;
+  gap: 0.35rem;
+  font-size: 1.1rem;
+  filter: drop-shadow(0 0 8px rgba(244,80,80,0.5));
+  transition: filter 0.2s ease;
+}
+.game-hud__lives .life {
+  transition: opacity 0.3s ease, transform 0.3s ease, filter 0.3s ease;
+  display: inline-block;
+}
+.game-hud__lives .life.is-lost {
+  opacity: 0.15;
+  filter: grayscale(1) brightness(0.4);
+  transform: scale(0.75);
+}
 .game-hud__score {
   font-family: 'Space Mono', monospace;
   font-size: 1.4rem;
