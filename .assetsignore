@@ -1,0 +1,11 @@
+# files in this list are NOT uploaded as static assets to Cloudflare.
+# the Worker entrypoint and config files belong here — they should never
+# be served as static files at /worker/index.js etc.
+
+worker/
+wrangler.jsonc
+.gitignore
+.assetsignore
+.git/
+node_modules/
+README.md
