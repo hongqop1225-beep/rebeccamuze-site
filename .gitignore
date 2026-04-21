@@ -24,3 +24,9 @@ npm-debug.log*
 node_modules/
 .cache/
 .netlify/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
