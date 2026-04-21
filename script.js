@@ -1729,15 +1729,18 @@ if (canvas) {
     ctx.shadowColor = iFrames ? 'rgba(244,80,80,0.9)' : 'rgba(212,255,58,0.9)';
     ctx.shadowBlur = iFrames ? 30 : 24;
     if (!blinkHide) {
+      // always draw a lime circle underneath — guarantees the skull is
+      // visible even if the PNG / filter pipeline hiccups on some browsers
+      ctx.fillStyle = iFrames ? '#ff6a6a' : '#d4ff3a';
+      ctx.beginPath();
+      ctx.arc(0, 0, SKULL_SIZE/2 - 2, 0, Math.PI*2);
+      ctx.fill();
       if (skullImg.complete && skullImg.naturalWidth) {
-        ctx.filter = 'brightness(0.8) contrast(1.5) sepia(1) saturate(5) hue-rotate(38deg)';
-        ctx.drawImage(skullImg, -SKULL_SIZE/2, -SKULL_SIZE/2, SKULL_SIZE, SKULL_SIZE);
+        try {
+          ctx.filter = 'brightness(0.8) contrast(1.5) sepia(1) saturate(5) hue-rotate(38deg)';
+          ctx.drawImage(skullImg, -SKULL_SIZE/2, -SKULL_SIZE/2, SKULL_SIZE, SKULL_SIZE);
+        } catch (_) { /* fall back to the circle we already drew */ }
         ctx.filter = 'none';
-      } else {
-        ctx.fillStyle = '#d4ff3a';
-        ctx.beginPath();
-        ctx.arc(0, 0, SKULL_SIZE/2, 0, Math.PI*2);
-        ctx.fill();
       }
     }
     ctx.restore();
