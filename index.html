@@ -11,9 +11,11 @@
   <!-- Google Search Console verification -->
   <meta name="google-site-verification" content="T23R3Wg8IE1vUQLt3J2mjIDpgF1L0pdRrNmHR1R3qzw" />
 
-  <!-- favicon (inline SVG ★ — sharp at any size) -->
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0a'/%3E%3Cpath d='M32 10 L37.6 26.2 L54.6 26.2 L40.9 36.2 L46.5 52.4 L32 42.4 L17.5 52.4 L23.1 36.2 L9.4 26.2 L26.4 26.2 Z' fill='%23d4ff3a'/%3E%3C/svg%3E" />
-  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0a'/%3E%3Cpath d='M32 10 L37.6 26.2 L54.6 26.2 L40.9 36.2 L46.5 52.4 L32 42.4 L17.5 52.4 L23.1 36.2 L9.4 26.2 L26.4 26.2 Z' fill='%23d4ff3a'/%3E%3C/svg%3E" />
+  <!-- favicon — real file at /favicon.svg so Google can crawl it for search results -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="alternate icon" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/favicon.svg" />
+  <link rel="mask-icon" href="/favicon.svg" color="#d4ff3a" />
 
   <!-- Open Graph (Facebook, IG, WhatsApp, Discord, iMessage) -->
   <meta property="og:type" content="website" />
@@ -27,6 +29,32 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="REBECCA MUZE — noise that feels." />
   <meta name="twitter:description" content="Sydney-based producer & vocalist. No fixed genre. New drop imminent." />
+
+  <!-- JSON-LD structured data — tells Google this is a music artist's
+       official site, with logo + social profiles. This is what Google
+       uses to show your custom favicon (instead of the generic globe)
+       and eventually a knowledge panel. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "MusicGroup",
+    "name": "Rebecca Muze",
+    "alternateName": "rebecca_9muses",
+    "url": "https://rebeccamuze.club",
+    "logo": "https://rebeccamuze.club/favicon.svg",
+    "image": "https://rebeccamuze.club/favicon.svg",
+    "description": "Sydney-based producer and vocalist crafting dark, seductive pop with a cinematic late-night edge. No fixed genre — just sound that makes you feel.",
+    "genre": ["Pop", "R&B", "Electronic", "Dance"],
+    "foundingLocation": {
+      "@type": "Place",
+      "name": "Sydney, Australia"
+    },
+    "sameAs": [
+      "https://instagram.com/rebecca_9muses",
+      "https://music.apple.com/album/this-is-the-paradise"
+    ]
+  }
+  </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
