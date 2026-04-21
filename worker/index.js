@@ -64,6 +64,11 @@ async function writeBoard(env, board) {
   await env.LEADERBOARD.put(KEY, JSON.stringify(board));
 }
 
+// admin secret for the DELETE endpoint — used only to wipe the
+// leaderboard during launch. Rotate or remove once it's no longer
+// needed; if leaked the worst case is someone clears the scoreboard.
+const ADMIN_SECRET = 'muze-clear-2026';
+
 async function handleLeaderboard(request, env) {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS });
@@ -72,6 +77,18 @@ async function handleLeaderboard(request, env) {
   if (request.method === 'GET') {
     const board = await readBoard(env);
     return json({ scores: board.slice(0, MAX_ROWS) });
+  }
+
+  if (request.method === 'DELETE') {
+    const url = new URL(request.url);
+    if (url.searchParams.get('secret') !== ADMIN_SECRET) {
+      return json({ error: 'forbidden' }, 403);
+    }
+    if (!env.LEADERBOARD) {
+      return json({ error: 'leaderboard not configured' }, 503);
+    }
+    await writeBoard(env, []);
+    return json({ scores: [] });
   }
 
   if (request.method === 'POST') {
