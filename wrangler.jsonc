@@ -12,5 +12,14 @@
   },
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  // KV namespace for the Flappy Skull leaderboard.
+  // Baking the ID here means deploys can never wipe the binding again —
+  // it's part of the config instead of a dashboard setting.
+  "kv_namespaces": [
+    {
+      "binding": "LEADERBOARD",
+      "id": "b9134830947a4c6fbd0c63c74c89819c"
+    }
   ]
 }
