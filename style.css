@@ -658,6 +658,28 @@ body {
   .equalizer { height: 44px; }
 }
 
+/* latest release marker — sits above the Spotify embed */
+.listen__latest {
+  max-width: 720px;
+  margin: -0.5rem 0 1.1rem;
+  color: rgba(244, 244, 240, 0.78);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+  padding: 0.55rem 0.9rem;
+  border: 1px dashed rgba(212, 255, 58, 0.4);
+  border-radius: 999px;
+  display: inline-block;
+}
+.listen__latest strong {
+  color: var(--lime);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(212, 255, 58, 0.55);
+}
+
 /* listen CTAs — the "feed the algorithm" funnel */
 .listen__nudge {
   max-width: 720px;
@@ -809,12 +831,18 @@ body {
 .footer {
   display: flex;
   justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
   padding: 2rem;
   font-family: 'Space Mono', monospace;
   font-size: 0.75rem;
   color: var(--muted);
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+.footer__label {
+  color: rgba(212, 255, 58, 0.72);
+  letter-spacing: 0.12em;
 }
 
 /* sticker badges floating in hero */
