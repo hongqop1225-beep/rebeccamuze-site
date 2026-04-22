@@ -1234,15 +1234,18 @@ if (canvas) {
   let W = 0, H = 0, dpr = 1;
 
   // physics constants (tuned for 60fps feel)
+  // difficulty softened 2026-04-21 — old numbers felt "rage-quit hard" on
+  // first play. goal: challenging but fair, especially for new visitors.
+  // only tuning numbers, not logic, so nothing can break.
   const GRAVITY = 0.55;
   const FLAP = -9.2;
   const MAX_FALL = 14;
   const SKULL_SIZE = 56;
   const SKULL_X_RATIO = 0.28; // skull stays at 28% from left
   const PIPE_W = 68;
-  const PIPE_GAP_BASE = 180;
-  const PIPE_SPACING = 260;   // horizontal distance between pipes
-  const SCROLL_BASE = 3.2;
+  const PIPE_GAP_BASE = 210;   // was 180 — more room to pass through
+  const PIPE_SPACING = 300;    // was 260 — more time between obstacles
+  const SCROLL_BASE = 2.9;     // was 3.2 — gentler starting speed
 
   // entities
   const bird = { y: 0, vy: 0, rot: 0 };
@@ -1492,7 +1495,9 @@ if (canvas) {
   function spawnPipe(xPos) {
     const minGapY = 90;
     const maxGapY = H - 90;
-    const gap = Math.max(140, PIPE_GAP_BASE - score * 1.2);
+    // difficulty ramp — gap shrinks as score rises, but slower than before
+    // (was score * 1.2 / min 140). new curve: score * 0.8 / min 155.
+    const gap = Math.max(155, PIPE_GAP_BASE - score * 0.8);
     const gapCenter = minGapY + gap/2 + Math.random() * (maxGapY - minGapY - gap);
     pipes.push({
       x: xPos,
@@ -1579,7 +1584,10 @@ if (canvas) {
     ctx.globalAlpha = 1;
 
     // ---- difficulty ramp ----
-    scroll = SCROLL_BASE + Math.min(2.2, score * 0.08);
+    // speed ramps up slower than before (was score * 0.08 / max +2.2).
+    // new curve: score * 0.06 / max +1.9 — still gets challenging, but
+    // players have more time to build skill before it gets punishing.
+    scroll = SCROLL_BASE + Math.min(1.9, score * 0.06);
 
     // ---- update + draw pipes ----
     for (let i = pipes.length - 1; i >= 0; i--) {
