@@ -138,7 +138,8 @@ const CLUB_MAX_POSTS = 300;           // keep the newest N, trim older
 const CLUB_HANDLE_MIN = 2;
 const CLUB_HANDLE_MAX = 20;
 const CLUB_MESSAGE_MAX = 280;
-const CLUB_RATE_WINDOW_SEC = 30;       // one post per IP per 30s
+const CLUB_RATE_WINDOW_SEC = 60;       // one post per IP per 60s
+                                       // (Cloudflare KV requires expirationTtl >= 60)
 const CLUB_LIKE_CEILING = 9999;
 
 // Handles nobody else can claim — protects the artist + label identity.
@@ -242,7 +243,7 @@ async function handleClubPosts(request, env) {
     // rate-limit BEFORE parsing body — cheapest possible guard
     const ip = clientIp(request);
     if (await isRateLimited(env, ip)) {
-      return json({ error: 'slow down — one post per 30 seconds' }, 429);
+      return json({ error: 'slow down — one post per minute' }, 429);
     }
 
     let body;
