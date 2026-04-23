@@ -63,7 +63,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=Space+Mono:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=38" />
+  <link rel="stylesheet" href="style.css?v=39" />
   <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
   <script src="https://unpkg.com/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
@@ -215,6 +215,7 @@
       <li><a href="#about">about</a></li>
       <li><a href="#next">next</a></li>
       <li><a href="#listen">listen</a></li>
+      <li><a href="#club">club</a></li>
       <li><a href="#connect">connect</a></li>
     </ul>
   </nav>
@@ -340,9 +341,76 @@
     </div>
   </section>
 
+  <!-- ============================================================
+       THE CLUB — fan wall. No accounts, no email. Pick a handle,
+       drop a message, heart other fans' posts. Identity persists
+       via LocalStorage. Backed by the Cloudflare Worker /api/club.
+       ============================================================ -->
+  <section class="section section--club" id="club">
+    <div class="section__edge" aria-hidden="true">// THE CLUB · FAN LETTERS · DROP A NOTE · NO SIGNUP · JUST VIBES //</div>
+    <p class="section__num">/ 05 · the club</p>
+    <h2 class="section__title">join the <em>club</em><span class="dot">.</span></h2>
+    <p class="club__hint">no email. no password. pick a handle, drop a note. that's it.</p>
+
+    <!-- JOIN state: shown until a handle is saved to LocalStorage -->
+    <div class="club__join" id="clubJoin">
+      <form class="club-join-form" id="clubJoinForm" autocomplete="off">
+        <label class="club-join-form__label" for="clubHandleInput">pick your handle</label>
+        <div class="club-join-form__row">
+          <span class="club-join-form__at">@</span>
+          <input
+            type="text"
+            id="clubHandleInput"
+            name="handle"
+            class="club-join-form__input"
+            placeholder="your_handle"
+            maxlength="20"
+            pattern="[A-Za-z0-9_]{2,20}"
+            required
+            aria-label="your handle" />
+          <button type="submit" class="btn btn--primary">join ↗</button>
+        </div>
+        <p class="club-join-form__rules">letters, numbers, underscore · 2-20 chars · stays in your browser</p>
+      </form>
+    </div>
+
+    <!-- POST state: shown once joined — compose + feed -->
+    <div class="club__posting" id="clubPosting" hidden>
+      <div class="club__you">
+        <span class="club__you-label">you're in as</span>
+        <span class="club__you-handle" id="clubYouHandle">@...</span>
+        <button type="button" class="club__you-change" id="clubChangeBtn">change ↗</button>
+      </div>
+
+      <form class="club-post-form" id="clubPostForm" autocomplete="off">
+        <!-- honeypot — hidden from humans, bots fill it out -->
+        <p class="club-post-form__honey" aria-hidden="true">
+          <label>website: <input name="website" tabindex="-1" autocomplete="off" /></label>
+        </p>
+        <textarea
+          id="clubMessageInput"
+          name="message"
+          class="club-post-form__textarea"
+          placeholder="say something nice... or dramatic. your call."
+          maxlength="280"
+          rows="3"
+          required></textarea>
+        <div class="club-post-form__row">
+          <span class="club-post-form__count" id="clubCount">280</span>
+          <button type="submit" class="btn btn--primary">post ↯</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- FEED: rendered dynamically by script.js -->
+    <div class="club__feed" id="clubFeed" aria-live="polite">
+      <p class="club__feed-empty" id="clubFeedEmpty">loading the wall...</p>
+    </div>
+  </section>
+
   <section class="section section--connect" id="connect">
     <div class="section__edge" aria-hidden="true">// TAP IN · SAY HI · INSTAGRAM · @REBECCA_9MUSES · DM ME //</div>
-    <p class="section__num">/ 05 · find me</p>
+    <p class="section__num">/ 06 · find me</p>
     <h2 class="section__title">say hi<span class="dot">.</span></h2>
     <p class="connect__hint">i live on instagram. tap in ↓</p>
     <a href="https://instagram.com/rebecca_9muses" target="_blank" rel="noopener" class="ig-link" aria-label="follow rebecca muze on instagram">
@@ -366,6 +434,6 @@
     <span>made with ♥ + noise</span>
   </footer>
 
-  <script src="script.js?v=35"></script>
+  <script src="script.js?v=36"></script>
 </body>
 </html>

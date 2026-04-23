@@ -1789,3 +1789,287 @@ if (canvas) {
     if (e.key === 'Escape' && mode.classList.contains('is-active')) closeGame();
   });
 })();
+
+/* =====================================================================
+   THE CLUB — fan wall. pick a handle (stored in localStorage),
+   post short messages, heart other fans' posts. no email, no account.
+   backed by /api/club/posts on the Cloudflare Worker.
+   ===================================================================== */
+(function initClub() {
+  const joinWrap = document.getElementById('clubJoin');
+  const joinForm = document.getElementById('clubJoinForm');
+  const handleInput = document.getElementById('clubHandleInput');
+  const postingWrap = document.getElementById('clubPosting');
+  const youHandle = document.getElementById('clubYouHandle');
+  const changeBtn = document.getElementById('clubChangeBtn');
+  const postForm = document.getElementById('clubPostForm');
+  const messageInput = document.getElementById('clubMessageInput');
+  const countEl = document.getElementById('clubCount');
+  const feed = document.getElementById('clubFeed');
+  const feedEmpty = document.getElementById('clubFeedEmpty');
+
+  if (!joinWrap || !postForm || !feed) return; // safety: section not present
+
+  // ---------- local identity ----------
+  const LS_HANDLE = 'rm_club_handle';
+  const LS_LIKES = 'rm_club_likes'; // Set of post IDs this browser has liked
+  const LS_MINE = 'rm_club_mine';   // Set of post IDs authored from this browser
+
+  function getHandle() {
+    try { return localStorage.getItem(LS_HANDLE) || ''; } catch (_) { return ''; }
+  }
+  function setHandle(h) {
+    try { localStorage.setItem(LS_HANDLE, h); } catch (_) {}
+  }
+  function clearHandle() {
+    try { localStorage.removeItem(LS_HANDLE); } catch (_) {}
+  }
+
+  function readSet(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return new Set();
+      const arr = JSON.parse(raw);
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch (_) { return new Set(); }
+  }
+  function writeSet(key, set) {
+    try { localStorage.setItem(key, JSON.stringify(Array.from(set))); } catch (_) {}
+  }
+
+  let likedSet = readSet(LS_LIKES);
+  let mineSet = readSet(LS_MINE);
+
+  // ---------- UI state toggle ----------
+  function showJoin() {
+    joinWrap.hidden = false;
+    postingWrap.hidden = true;
+  }
+  function showPosting(handle) {
+    joinWrap.hidden = true;
+    postingWrap.hidden = false;
+    youHandle.textContent = '@' + handle;
+  }
+
+  // ---------- handle validation (same rules as server) ----------
+  function normalizeHandle(raw) {
+    if (typeof raw !== 'string') return null;
+    const h = raw.replace(/^@+/, '').trim().toLowerCase();
+    if (!/^[a-z0-9_]{2,20}$/.test(h)) return null;
+    return h;
+  }
+
+  // ---------- format helpers ----------
+  function timeAgo(ts) {
+    const diff = Date.now() - ts;
+    if (diff < 60_000) return 'just now';
+    if (diff < 3_600_000) return Math.floor(diff / 60_000) + 'm ago';
+    if (diff < 86_400_000) return Math.floor(diff / 3_600_000) + 'h ago';
+    const d = Math.floor(diff / 86_400_000);
+    if (d < 7) return d + 'd ago';
+    return new Date(ts).toLocaleDateString();
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  // ---------- API wrappers ----------
+  async function apiFetchPosts() {
+    try {
+      const res = await fetch('/api/club/posts');
+      if (!res.ok) throw new Error('fetch failed');
+      const data = await res.json();
+      return Array.isArray(data.posts) ? data.posts : [];
+    } catch (_) { return []; }
+  }
+
+  async function apiPost(handle, message) {
+    const res = await fetch('/api/club/posts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ handle, message, website: '' }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.error || 'post failed');
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  async function apiLike(postId, delta) {
+    try {
+      const res = await fetch(`/api/club/posts/${encodeURIComponent(postId)}/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delta }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.post || null;
+    } catch (_) { return null; }
+  }
+
+  // ---------- render ----------
+  function renderFeed(posts) {
+    if (!posts.length) {
+      feed.innerHTML = '';
+      feedEmpty.hidden = false;
+      feedEmpty.textContent = "no fan letters yet. be the first ↯";
+      feed.appendChild(feedEmpty);
+      return;
+    }
+    feedEmpty.hidden = true;
+
+    feed.innerHTML = posts.map(p => {
+      const isMine = mineSet.has(p.id);
+      const isLiked = likedSet.has(p.id);
+      // artist / label handles get a special pinned look
+      const isOfficial = ['rebecca_9muses', 'rebecca', 'rebeccamuze', 'vela'].includes(p.handle);
+      const classes = ['club-post'];
+      if (isMine) classes.push('club-post--mine');
+      if (isOfficial) classes.push('club-post--pinned');
+      return `
+        <article class="${classes.join(' ')}" data-id="${escapeHtml(p.id)}">
+          <header class="club-post__head">
+            <span class="club-post__handle">@${escapeHtml(p.handle)}</span>
+            ${isOfficial ? '<span class="club-post__badge">artist</span>' : ''}
+            ${isMine && !isOfficial ? '<span class="club-post__badge" style="background:rgba(212,255,58,0.15);color:#d4ff3a;border-color:rgba(212,255,58,0.4);">you</span>' : ''}
+            <span class="club-post__time">${escapeHtml(timeAgo(p.ts))}</span>
+          </header>
+          <p class="club-post__message">${escapeHtml(p.message)}</p>
+          <footer class="club-post__foot">
+            <button type="button" class="club-post__like ${isLiked ? 'is-liked' : ''}" data-like="${escapeHtml(p.id)}">
+              <span class="club-post__like-heart" aria-hidden="true">${isLiked ? '♥' : '♡'}</span>
+              <span class="club-post__like-count">${p.likes || 0}</span>
+            </button>
+          </footer>
+        </article>
+      `;
+    }).join('');
+  }
+
+  // ---------- refresh ----------
+  let lastRefresh = 0;
+  async function refresh() {
+    lastRefresh = Date.now();
+    const posts = await apiFetchPosts();
+    renderFeed(posts);
+  }
+
+  // ---------- events ----------
+  joinForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const raw = handleInput.value;
+    const clean = normalizeHandle(raw);
+    if (!clean) {
+      handleInput.setCustomValidity('2-20 chars · letters, numbers, underscore');
+      handleInput.reportValidity();
+      handleInput.addEventListener('input', () => handleInput.setCustomValidity(''), { once: true });
+      return;
+    }
+    setHandle(clean);
+    showPosting(clean);
+    messageInput.focus();
+  });
+
+  changeBtn.addEventListener('click', () => {
+    if (!confirm('change your handle? your past posts stay — you just post under a new name from now on.')) return;
+    clearHandle();
+    handleInput.value = '';
+    showJoin();
+    handleInput.focus();
+  });
+
+  // live char counter + warn at low remaining
+  messageInput.addEventListener('input', () => {
+    const remaining = 280 - messageInput.value.length;
+    countEl.textContent = String(remaining);
+    countEl.classList.toggle('is-warn', remaining < 20);
+  });
+
+  postForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const handle = getHandle();
+    if (!handle) { showJoin(); return; }
+    const message = messageInput.value.trim();
+    if (!message) return;
+
+    const submitBtn = postForm.querySelector('button[type="submit"]');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'posting…'; }
+
+    try {
+      const data = await apiPost(handle, message);
+      if (data && data.post && data.post.id) {
+        mineSet.add(data.post.id);
+        writeSet(LS_MINE, mineSet);
+      }
+      messageInput.value = '';
+      countEl.textContent = '280';
+      countEl.classList.remove('is-warn');
+      if (data && Array.isArray(data.posts)) {
+        renderFeed(data.posts);
+      } else {
+        await refresh();
+      }
+    } catch (err) {
+      alert(err.message || 'could not post — try again in a sec');
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'post ↯'; }
+    }
+  });
+
+  // delegate like clicks
+  feed.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.club-post__like');
+    if (!btn) return;
+    const id = btn.dataset.like;
+    if (!id) return;
+
+    const willLike = !likedSet.has(id);
+    // optimistic UI
+    btn.classList.toggle('is-liked', willLike);
+    const heart = btn.querySelector('.club-post__like-heart');
+    const count = btn.querySelector('.club-post__like-count');
+    if (heart) heart.textContent = willLike ? '♥' : '♡';
+    if (count) count.textContent = String(Math.max(0, (parseInt(count.textContent, 10) || 0) + (willLike ? 1 : -1)));
+
+    if (willLike) likedSet.add(id); else likedSet.delete(id);
+    writeSet(LS_LIKES, likedSet);
+
+    // fire-and-forget to server; if it fails the optimistic UI still wins
+    // until next refresh, which is fine for low-stakes social interactions
+    const updated = await apiLike(id, willLike ? 1 : -1);
+    if (updated && count) count.textContent = String(updated.likes || 0);
+  });
+
+  // lazy-refresh when the club section comes into view, so we don't
+  // hit the API on page load for users who never scroll there
+  const section = document.getElementById('club');
+  if (section && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          refresh();
+          // gentle background refresh every 30s while visible
+          const interval = setInterval(() => {
+            if (!document.hidden) refresh();
+          }, 30_000);
+          section.dataset.refreshInterval = String(interval);
+          io.unobserve(section);
+        }
+      });
+    }, { rootMargin: '200px' });
+    io.observe(section);
+  } else {
+    refresh();
+  }
+
+  // initial state
+  const saved = getHandle();
+  if (saved) showPosting(saved); else showJoin();
+})();

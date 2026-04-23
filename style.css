@@ -1216,6 +1216,282 @@ body {
   transform: translateY(-2px);
 }
 
+/* ============================================================
+   CLUB — fan wall. dark card aesthetic, lime highlights,
+   minimal chrome, reads like a group chat / twitter hybrid.
+   ============================================================ */
+.section--club {
+  position: relative;
+}
+.club__hint {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0.25rem 0 1.75rem;
+  letter-spacing: 0.05em;
+  max-width: 520px;
+}
+
+/* JOIN FORM — what new visitors see */
+.club__join {
+  max-width: 520px;
+  margin-bottom: 2rem;
+}
+.club-join-form__label {
+  display: block;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(244, 244, 240, 0.55);
+  margin-bottom: 0.6rem;
+}
+.club-join-form__row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(212, 255, 58, 0.22);
+  border-radius: 12px;
+  padding: 0.4rem 0.4rem 0.4rem 0.9rem;
+}
+.club-join-form__row:focus-within {
+  border-color: rgba(212, 255, 58, 0.6);
+  box-shadow: 0 0 0 3px rgba(212, 255, 58, 0.12);
+}
+.club-join-form__at {
+  color: var(--lime);
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  font-size: 1.05rem;
+  align-self: center;
+  padding-right: 0.1rem;
+}
+.club-join-form__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--fg);
+  font-family: 'Space Mono', monospace;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  padding: 0.65rem 0.3rem;
+}
+.club-join-form__input::placeholder {
+  color: rgba(244, 244, 240, 0.35);
+}
+.club-join-form__rules {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.72rem;
+  color: rgba(244, 244, 240, 0.42);
+  letter-spacing: 0.05em;
+  margin-top: 0.6rem;
+}
+
+/* JOINED STATE — the "you're in" card + post form */
+.club__you {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.9rem;
+  background: rgba(212, 255, 58, 0.08);
+  border: 1px dashed rgba(212, 255, 58, 0.4);
+  border-radius: 999px;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.82rem;
+  margin-bottom: 1.1rem;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.club__you-label {
+  color: rgba(244, 244, 240, 0.55);
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+}
+.club__you-handle {
+  color: var(--lime);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.club__you-change {
+  background: none;
+  border: none;
+  color: rgba(244, 244, 240, 0.55);
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+.club__you-change:hover { color: var(--fg); }
+
+.club-post-form {
+  max-width: 640px;
+  margin-bottom: 2.25rem;
+}
+.club-post-form__honey {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.club-post-form__textarea {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(212, 255, 58, 0.22);
+  border-radius: 14px;
+  color: var(--fg);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.02rem;
+  line-height: 1.5;
+  padding: 0.95rem 1rem;
+  outline: none;
+  resize: vertical;
+  min-height: 84px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.club-post-form__textarea:focus {
+  border-color: rgba(212, 255, 58, 0.6);
+  box-shadow: 0 0 0 3px rgba(212, 255, 58, 0.12);
+}
+.club-post-form__textarea::placeholder {
+  color: rgba(244, 244, 240, 0.35);
+}
+.club-post-form__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.65rem;
+}
+.club-post-form__count {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.78rem;
+  color: rgba(244, 244, 240, 0.42);
+  letter-spacing: 0.05em;
+  min-width: 3ch;
+}
+.club-post-form__count.is-warn { color: #ff5ebc; }
+
+/* FEED — the wall itself */
+.club__feed {
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.club__feed-empty {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.85rem;
+  color: rgba(244, 244, 240, 0.42);
+  letter-spacing: 0.05em;
+  padding: 1rem 0;
+}
+.club-post {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 0.95rem 1rem 0.75rem;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.club-post:hover {
+  border-color: rgba(212, 255, 58, 0.25);
+}
+.club-post--mine {
+  border-color: rgba(212, 255, 58, 0.3);
+  background: rgba(212, 255, 58, 0.04);
+}
+.club-post--pinned {
+  border-color: rgba(255, 94, 188, 0.35);
+  background: rgba(255, 94, 188, 0.04);
+}
+.club-post__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  margin-bottom: 0.35rem;
+  flex-wrap: wrap;
+}
+.club-post__handle {
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--lime);
+  letter-spacing: 0.02em;
+}
+.club-post--pinned .club-post__handle {
+  color: #ff5ebc;
+}
+.club-post__badge {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 94, 188, 0.18);
+  color: #ff5ebc;
+  border: 1px solid rgba(255, 94, 188, 0.4);
+}
+.club-post__time {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.72rem;
+  color: rgba(244, 244, 240, 0.4);
+  letter-spacing: 0.05em;
+  margin-left: auto;
+}
+.club-post__message {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: var(--fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.club-post__foot {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+}
+.club-post__like {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  color: rgba(244, 244, 240, 0.6);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  user-select: none;
+}
+.club-post__like:hover {
+  border-color: rgba(255, 94, 188, 0.5);
+  color: #ff5ebc;
+}
+.club-post__like.is-liked {
+  border-color: rgba(255, 94, 188, 0.7);
+  color: #ff5ebc;
+  background: rgba(255, 94, 188, 0.08);
+}
+.club-post__like:active {
+  transform: scale(0.95);
+}
+.club-post__like-heart {
+  font-size: 0.92rem;
+  line-height: 1;
+}
+
 /* connect section hint */
 .connect__hint {
   font-family: 'Space Mono', monospace;
