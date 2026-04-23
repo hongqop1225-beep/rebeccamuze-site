@@ -1814,6 +1814,30 @@ if (canvas) {
   const LS_HANDLE = 'rm_club_handle';
   const LS_LIKES = 'rm_club_likes'; // Set of post IDs this browser has liked
   const LS_MINE = 'rm_club_mine';   // Set of post IDs authored from this browser
+  const LS_ADMIN = 'rm_club_admin'; // admin secret (artist-only) — unlocks delete buttons
+
+  // ---------- admin mode detection ----------
+  // Visit ?admin=THE_SECRET once → secret stored in localStorage → delete
+  // buttons appear next to every post on this browser, forever (or until
+  // localStorage is cleared). Param is then stripped from the URL so it
+  // doesn't appear in screenshots / get shared by accident.
+  (function initAdmin() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const incoming = params.get('admin');
+      if (incoming) {
+        localStorage.setItem(LS_ADMIN, incoming);
+        params.delete('admin');
+        const cleaned = params.toString();
+        const newUrl = window.location.pathname + (cleaned ? '?' + cleaned : '') + window.location.hash;
+        window.history.replaceState({}, '', newUrl);
+      }
+    } catch (_) { /* ignore */ }
+  })();
+  function getAdminSecret() {
+    try { return localStorage.getItem(LS_ADMIN) || ''; } catch (_) { return ''; }
+  }
+  const isAdmin = () => Boolean(getAdminSecret());
 
   function getHandle() {
     try { return localStorage.getItem(LS_HANDLE) || ''; } catch (_) { return ''; }
@@ -1925,6 +1949,8 @@ if (canvas) {
     }
     feedEmpty.hidden = true;
 
+    const adminMode = isAdmin();
+
     feed.innerHTML = posts.map(p => {
       const isMine = mineSet.has(p.id);
       const isLiked = likedSet.has(p.id);
@@ -1933,6 +1959,9 @@ if (canvas) {
       const classes = ['club-post'];
       if (isMine) classes.push('club-post--mine');
       if (isOfficial) classes.push('club-post--pinned');
+      // detect "@handle " at start of message → render as a reply marker
+      const replyMatch = p.message.match(/^@([a-z0-9_]{2,20})\s/i);
+      const replyTo = replyMatch ? replyMatch[1].toLowerCase() : null;
       return `
         <article class="${classes.join(' ')}" data-id="${escapeHtml(p.id)}">
           <header class="club-post__head">
@@ -1941,12 +1970,15 @@ if (canvas) {
             ${isMine && !isOfficial ? '<span class="club-post__badge" style="background:rgba(212,255,58,0.15);color:#d4ff3a;border-color:rgba(212,255,58,0.4);">you</span>' : ''}
             <span class="club-post__time">${escapeHtml(timeAgo(p.ts))}</span>
           </header>
+          ${replyTo ? `<p class="club-post__replyto">↪ replying to @${escapeHtml(replyTo)}</p>` : ''}
           <p class="club-post__message">${escapeHtml(p.message)}</p>
           <footer class="club-post__foot">
             <button type="button" class="club-post__like ${isLiked ? 'is-liked' : ''}" data-like="${escapeHtml(p.id)}">
               <span class="club-post__like-heart" aria-hidden="true">${isLiked ? '♥' : '♡'}</span>
               <span class="club-post__like-count">${p.likes || 0}</span>
             </button>
+            <button type="button" class="club-post__reply" data-reply="${escapeHtml(p.handle)}">↪ reply</button>
+            ${adminMode ? `<button type="button" class="club-post__delete" data-delete="${escapeHtml(p.id)}" title="delete this post (admin)">🗑 delete</button>` : ''}
           </footer>
         </article>
       `;
@@ -2023,28 +2055,97 @@ if (canvas) {
     }
   });
 
-  // delegate like clicks
+  // delegate post-card clicks: like / reply / delete (admin only)
   feed.addEventListener('click', async (e) => {
-    const btn = e.target.closest('.club-post__like');
-    if (!btn) return;
-    const id = btn.dataset.like;
-    if (!id) return;
+    // ---- LIKE ----
+    const likeBtn = e.target.closest('.club-post__like');
+    if (likeBtn) {
+      const id = likeBtn.dataset.like;
+      if (!id) return;
+      const willLike = !likedSet.has(id);
+      // optimistic UI
+      likeBtn.classList.toggle('is-liked', willLike);
+      const heart = likeBtn.querySelector('.club-post__like-heart');
+      const count = likeBtn.querySelector('.club-post__like-count');
+      if (heart) heart.textContent = willLike ? '♥' : '♡';
+      if (count) count.textContent = String(Math.max(0, (parseInt(count.textContent, 10) || 0) + (willLike ? 1 : -1)));
+      if (willLike) likedSet.add(id); else likedSet.delete(id);
+      writeSet(LS_LIKES, likedSet);
+      // fire-and-forget to server; if it fails the optimistic UI still wins
+      // until next refresh, which is fine for low-stakes social interactions
+      const updated = await apiLike(id, willLike ? 1 : -1);
+      if (updated && count) count.textContent = String(updated.likes || 0);
+      return;
+    }
 
-    const willLike = !likedSet.has(id);
-    // optimistic UI
-    btn.classList.toggle('is-liked', willLike);
-    const heart = btn.querySelector('.club-post__like-heart');
-    const count = btn.querySelector('.club-post__like-count');
-    if (heart) heart.textContent = willLike ? '♥' : '♡';
-    if (count) count.textContent = String(Math.max(0, (parseInt(count.textContent, 10) || 0) + (willLike ? 1 : -1)));
+    // ---- REPLY ----
+    const replyBtn = e.target.closest('.club-post__reply');
+    if (replyBtn) {
+      const replyHandle = replyBtn.dataset.reply;
+      if (!replyHandle) return;
+      // make sure user has joined first
+      if (!getHandle()) {
+        showJoin();
+        document.getElementById('club').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        handleInput.focus();
+        return;
+      }
+      // prefill compose with @handle and focus the textarea
+      const prefill = '@' + replyHandle + ' ';
+      // if already replying to this same handle, just focus; otherwise prefill fresh
+      if (!messageInput.value.startsWith(prefill)) {
+        messageInput.value = prefill;
+      }
+      // update the char counter
+      const remaining = 280 - messageInput.value.length;
+      countEl.textContent = String(remaining);
+      countEl.classList.toggle('is-warn', remaining < 20);
+      // scroll the compose into view, then focus + put cursor at end
+      messageInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        messageInput.focus();
+        messageInput.setSelectionRange(messageInput.value.length, messageInput.value.length);
+      }, 200);
+      return;
+    }
 
-    if (willLike) likedSet.add(id); else likedSet.delete(id);
-    writeSet(LS_LIKES, likedSet);
-
-    // fire-and-forget to server; if it fails the optimistic UI still wins
-    // until next refresh, which is fine for low-stakes social interactions
-    const updated = await apiLike(id, willLike ? 1 : -1);
-    if (updated && count) count.textContent = String(updated.likes || 0);
+    // ---- DELETE (admin only) ----
+    const delBtn = e.target.closest('.club-post__delete');
+    if (delBtn) {
+      const id = delBtn.dataset.delete;
+      if (!id) return;
+      if (!isAdmin()) {
+        alert('admin secret missing — re-open with ?admin=YOUR_SECRET');
+        return;
+      }
+      if (!confirm('delete this post? this cannot be undone.')) return;
+      delBtn.disabled = true;
+      delBtn.textContent = 'deleting…';
+      try {
+        const secret = encodeURIComponent(getAdminSecret());
+        const res = await fetch(`/api/club/posts?secret=${secret}&id=${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          alert(data.error || 'delete failed — secret may be wrong');
+          delBtn.disabled = false;
+          delBtn.textContent = '🗑 delete';
+          return;
+        }
+        // server returns the updated post list
+        if (Array.isArray(data.posts)) {
+          renderFeed(data.posts);
+        } else {
+          await refresh();
+        }
+      } catch (_) {
+        alert('delete failed — network error');
+        delBtn.disabled = false;
+        delBtn.textContent = '🗑 delete';
+      }
+      return;
+    }
   });
 
   // lazy-refresh when the club section comes into view, so we don't

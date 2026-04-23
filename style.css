@@ -1492,6 +1492,59 @@ body {
   line-height: 1;
 }
 
+/* reply button — sits next to like, neutral until hovered */
+.club-post__reply {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  color: rgba(244, 244, 240, 0.55);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  user-select: none;
+}
+.club-post__reply:hover {
+  border-color: rgba(94, 229, 255, 0.55);
+  color: #5ee5ff;
+}
+.club-post__reply:active { transform: scale(0.95); }
+
+/* admin-only delete button — pushed to the far right, danger styling */
+.club-post__delete {
+  margin-left: auto;
+  background: none;
+  border: 1px solid rgba(255, 80, 80, 0.35);
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  color: #ff8080;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.72rem;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+}
+.club-post__delete:hover {
+  background: rgba(255, 80, 80, 0.12);
+  color: #ffb0b0;
+  border-color: rgba(255, 120, 120, 0.7);
+}
+.club-post__delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* "↪ replying to @handle" marker above the message body */
+.club-post__replyto {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.72rem;
+  color: rgba(94, 229, 255, 0.78);
+  letter-spacing: 0.05em;
+  margin: -0.1rem 0 0.35rem;
+}
+
 /* connect section hint */
 .connect__hint {
   font-family: 'Space Mono', monospace;
